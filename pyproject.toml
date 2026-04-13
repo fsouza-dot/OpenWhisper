@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Local-first dictation assistant for Windows."
 requires-python = ">=3.11"
 readme = "README.md"
-authors = [{ name = "Felipe" }]
+authors = [{ name = "OpenWhisper Contributors" }]
 license = "MIT"
 keywords = ["dictation", "speech-to-text", "whisper", "voice", "transcription"]
 classifiers = [
@@ -36,9 +36,9 @@ dependencies = [
 dev = ["pytest>=8", "pytest-mock>=3.12"]
 
 [project.urls]
-Homepage = "https://github.com/felipepimentel/OpenWhisper"
-Repository = "https://github.com/felipepimentel/OpenWhisper"
-Issues = "https://github.com/felipepimentel/OpenWhisper/issues"
+Homepage = "https://github.com/fsouza-dot/OpenWhisper"
+Repository = "https://github.com/fsouza-dot/OpenWhisper"
+Issues = "https://github.com/fsouza-dot/OpenWhisper/issues"
 
 [project.scripts]
 openwhisper = "openwhisper.__main__:main"

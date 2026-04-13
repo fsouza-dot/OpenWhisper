@@ -24,14 +24,13 @@ OpenWhisper was **vibecoded in an afternoon** — built rapidly with AI assistan
 
 OpenWhisper sits in your system tray. Press **Alt+Space**, speak, release — your words appear as clean text in whatever app you're using. No clicking, no separate window, no friction.
 
-Built on [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) (local) or Groq's hosted `whisper-large-v3-turbo` (cloud), with optional Claude cleanup. Works in every app via clipboard + synthesized `Ctrl+V`.
+Built on [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) (local) or Groq's hosted `whisper-large-v3-turbo` (cloud). Works in every app via clipboard + synthesized `Ctrl+V`.
 
 ## Features
 
 - **Global push-to-talk hotkey** (default **Alt+Space**) — works in every app
 - **Two STT backends** — local `faster-whisper` or Groq cloud (sub-second transcription)
 - **Multilingual** — English + Portuguese out of the box, easy to add more
-- **Claude-powered cleanup** (optional) — punctuation, grammar, filler removal
 - **Personal dictionary** — names, jargon, product terms
 - **Snippets** — `/sig` expands to your signature, etc.
 - **Minimal UI** — tiny floating indicator while recording, otherwise invisible
@@ -52,7 +51,7 @@ Built on [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) (local) o
 ### From Source
 
 ```powershell
-git clone https://github.com/felipepimentel/OpenWhisper.git
+git clone https://github.com/fsouza-dot/OpenWhisper.git
 cd OpenWhisper
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -99,7 +98,7 @@ PRs for Mac/Linux support are especially welcome!
 - **Audio stays in RAM** — never written to disk
 - **Keys in Credential Manager** — not in config files
 - **No telemetry** — zero analytics, zero tracking
-- **You control the network** — only calls the STT/LLM providers you configure
+- **You control the network** — only calls the STT providers you configure
 
 ## Architecture
 

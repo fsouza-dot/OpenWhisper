@@ -31,7 +31,7 @@ Thanks for your interest in OpenWhisper! This project was vibecoded in an aftern
 Windows 10/11, Python 3.11+:
 
 ```powershell
-git clone https://github.com/felipepimentel/OpenWhisper.git
+git clone https://github.com/fsouza-dot/OpenWhisper.git
 cd OpenWhisper
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -41,7 +41,7 @@ python run.py
 
 For Mac/Linux development (partial support):
 ```bash
-git clone https://github.com/felipepimentel/OpenWhisper.git
+git clone https://github.com/fsouza-dot/OpenWhisper.git
 cd OpenWhisper
 python3 -m venv .venv
 source .venv/bin/activate
