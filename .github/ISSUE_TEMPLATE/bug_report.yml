@@ -1,0 +1,57 @@
+name: Bug report
+description: Something in OpenWhisper isn't working the way you expect.
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug. A small, specific repro is worth a thousand words.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what did you get instead?
+      placeholder: "I held Alt+Space and spoke, but nothing was pasted into Notepad."
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Launch OpenWhisper
+        2. Focus Notepad
+        3. Hold Alt+Space and say "hello world"
+        4. Release
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OpenWhisper version / commit
+      placeholder: "v0.3.0 or a commit SHA"
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Windows version
+      placeholder: "Windows 11 23H2"
+    validations:
+      required: true
+  - type: dropdown
+    id: backend
+    attributes:
+      label: STT backend in use
+      options:
+        - Groq (cloud)
+        - Local faster-whisper
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: From `%APPDATA%\OpenWhisper\openwhisper.log`. Redact anything sensitive.
+      render: text

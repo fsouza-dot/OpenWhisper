@@ -1,0 +1,60 @@
+# ---------- Python ----------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# ---------- Virtual envs ----------
+.venv/
+venv/
+env/
+ENV/
+
+# ---------- PyInstaller build output ----------
+build/
+dist/
+*.manifest
+# Keep the spec file — it's part of the build config.
+!OpenWhisper.spec
+
+# ---------- Editor / tooling state ----------
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---------- Claude Code workspace files ----------
+.claude/
+CLAUDE.md
+
+# ---------- Secrets & user data ----------
+# Nothing in this repo should contain real keys, but guard rails:
+.env
+.env.*
+*.pem
+*.key
+secrets.json
+settings.json
+
+# OpenWhisper runtime data that might sneak in during local testing
+openwhisper.log
+usage.json
+models/
+
+# ---------- Logs ----------
+*.log
+logs/
+
+# ---------- OS junk ----------
+desktop.ini

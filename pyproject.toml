@@ -1,0 +1,54 @@
+[project]
+name = "openwhisper"
+version = "0.1.0"
+description = "Local-first dictation assistant for Windows."
+requires-python = ">=3.11"
+readme = "README.md"
+authors = [{ name = "Felipe" }]
+license = "MIT"
+keywords = ["dictation", "speech-to-text", "whisper", "voice", "transcription"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Win32 (MS Windows)",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: Microsoft :: Windows :: Windows 10",
+    "Operating System :: Microsoft :: Windows :: Windows 11",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Multimedia :: Sound/Audio :: Speech",
+    "Topic :: Text Processing",
+]
+dependencies = [
+    "faster-whisper>=1.0.3",
+    "sounddevice>=0.4.7",
+    "numpy>=1.26",
+    "pynput>=1.7.7",
+    "pyperclip>=1.9.0",
+    "PySide6>=6.7",
+    "keyring>=25.0",
+    "httpx>=0.27",
+    "pydantic>=2.7",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "pytest-mock>=3.12"]
+
+[project.urls]
+Homepage = "https://github.com/felipepimentel/OpenWhisper"
+Repository = "https://github.com/felipepimentel/OpenWhisper"
+Issues = "https://github.com/felipepimentel/OpenWhisper/issues"
+
+[project.scripts]
+openwhisper = "openwhisper.__main__:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["openwhisper*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -1,0 +1,28 @@
+name: Feature request
+description: Suggest an improvement or a new feature.
+title: "[feature] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem are you trying to solve?
+      description: Start from the user pain, not the implementation. "I want X so I can Y."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would the ideal behavior look like? Sketches welcome.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope check
+      options:
+        - label: I've checked this isn't already in Settings.
+        - label: I've searched existing issues for duplicates.
