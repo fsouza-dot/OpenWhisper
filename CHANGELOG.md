@@ -12,8 +12,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Global push-to-talk hotkey (Alt+Space) with toggle mode option
 - Two STT backends: local faster-whisper and Groq cloud
 - Multilingual support (English + Portuguese)
-- Personal dictionary for custom terms
-- Snippet expansion (slash-style and phrase-style)
 - Minimal floating HUD with animated recording indicator
 - System tray integration with settings access
 - Microphone selector with test functionality

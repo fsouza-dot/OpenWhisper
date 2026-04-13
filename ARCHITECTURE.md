@@ -6,7 +6,7 @@
 2. **Work in any app.** No per-app integration. Clipboard + synthesized Ctrl+V is the universal insertion channel.
 3. **Degrade gracefully.** No Groq key? Use local whisper. No network? Local path still works end to end.
 4. **Privacy by construction.** Audio never touches disk. API keys live in Windows Credential Manager, not `settings.json`.
-5. **Swappable layers.** Every integration is behind a protocol in `protocols.py`. STT backends, text processing, text insertion — all pluggable.
+5. **Swappable layers.** Every integration is behind a protocol in `protocols.py`. STT backends, text insertion — all pluggable.
 
 ## Layering
 
@@ -23,8 +23,7 @@
                      │  (protocol calls)
 ┌─────────────────────────────────────────────────────────┐
 │  Domain layer (pure Python, no Qt / no win32)           │
-│  text processing · command interpreter · dictionary ·   │
-│  snippet expander · heuristic processing · history      │
+│  text processing · command interpreter · history        │
 └─────────────────────────────────────────────────────────┘
                      │
 ┌─────────────────────────────────────────────────────────┐
@@ -54,9 +53,7 @@ openwhisper/
 │   ├── whisper_provider.py   Local faster-whisper (CTranslate2)
 │   └── groq_provider.py      Cloud Groq /audio/transcriptions
 ├── cleanup/
-│   ├── pipeline.py     Orchestrates dictionary → snippets → heuristic
-│   ├── dictionary.py   Personal dictionary
-│   ├── snippets.py     Snippet expansion
+│   ├── pipeline.py     Orchestrates text processing
 │   └── heuristic.py    Regex/rules text processing
 ├── commands/
 │   ├── command.py      DictationCommand enum
@@ -80,14 +77,8 @@ openwhisper/
 ┌──────────┐  audio chunks   ┌────────────────┐   WAV   ┌───────────┐
 │ Recorder │ ──────────────▶ │  Coordinator   │ ──────▶ │ STT       │
 │ 16k mono │                 │  (worker thr.) │         │ Groq/local│
-└──────────┘                 └────────────────┘         └────┬──────┘
-                                     │ text                  │
-                                     ▼                       │
-                             ┌───────────────┐               │
-                             │ Processing    │ ◀─────────────┘
-                             │ dict→snip→heur│
-                             └───────┬───────┘
-                                     │ processed text + optional command
+└──────────┘                 └────────────────┘         └───────────┘
+                                     │ text
                                      ▼
                              ┌───────────────┐
                              │  Inserter     │
@@ -98,33 +89,32 @@ openwhisper/
 
 All heavy work (STT) runs on a background thread spawned by the
 coordinator. The Qt event loop is never blocked. Phase transitions are
-published to the UI via Qt signals — background threads emit through an
-intermediary signal that's handled on the Qt thread.
+published to the UI via Qt signals.
 
 ## Threading model
 
 - **Qt main thread** — owns every widget and timer. Handles UI events.
 - **Audio callback thread** — `sounddevice` InputStream callback; only appends to a lock-protected chunk list.
-- **Pipeline worker thread** — spawned by the coordinator on `PTT up`. Runs STT + text processing + insertion serially. Uses `_phase_signal`, `_preview_signal`, `_inserted_signal`, and `_schedule_idle_signal` to talk back to the Qt thread.
+- **Pipeline worker thread** — spawned by the coordinator on `PTT up`. Runs STT + insertion serially.
 - **Warmup thread** — launched at app start to preload the local whisper model so the first hotkey press doesn't eat the ~2–5 s model-load cost.
 
 ## State machine
 
-`coordinator.DictationCoordinator` owns the phase. `Phase` values: `idle`, `recording`, `transcribing`, `cleaning`, `inserting`, `error`. Transitions:
+`coordinator.DictationCoordinator` owns the phase. `Phase` values: `idle`, `recording`, `transcribing`, `inserting`, `error`. Transitions:
 
 - `idle → recording` — on PTT down / toggle first tap.
 - `recording → transcribing` — on PTT up / toggle second tap.
 - `transcribing → inserting` — after whisper returns non-empty text.
-- `inserting → idle` — after SendInput completes (auto-idle via `_schedule_idle_signal`).
-- `* → error → idle` — on any exception in STT/insertion, with a 1.5 s hold so the user sees the HUD flash orange.
+- `inserting → idle` — after SendInput completes.
+- `* → error → idle` — on any exception, with a 1.5 s hold so the user sees the HUD flash.
 
 ## Performance notes
 
-- **Local whisper** runs in **CPU int8** mode. `device="auto"` is overridden to `"cpu"` because CTranslate2 tries to load CUDA at encode time and the PyInstaller build does not ship cuBLAS.
-- **Transcribe flags** are tuned for push-to-talk dictation: `beam_size=1`, `vad_filter=False`, `without_timestamps=True`, `condition_on_previous_text=False`. Collectively ~2–3× faster than defaults.
+- **Local whisper** runs in **CPU int8** mode.
+- **Transcribe flags** are tuned for push-to-talk: `beam_size=1`, `vad_filter=False`, `without_timestamps=True`.
 - **Model warmup** happens on app start on a background thread.
-- **Groq backend** is the latency win when offline isn't required. It encodes Float32 → 16-bit PCM WAV with stdlib `wave`, posts multipart to `https://api.groq.com/openai/v1/audio/transcriptions`, and requests `response_format=text` to skip JSON overhead.
-- **Paste path** uses raw Windows `SendInput` via ctypes (40-byte INPUT struct sized for the 64-bit MOUSEINPUT variant) and force-releases Alt/Ctrl/Shift/Win before firing Ctrl+V — otherwise pynput's stale modifier tracking can turn the paste into Ctrl+Alt+V after an Alt+Space hotkey.
+- **Groq backend** is the latency win — sub-second transcription.
+- **Paste path** uses raw Windows `SendInput` via ctypes.
 
 ## Data locations
 
@@ -135,6 +125,6 @@ intermediary signal that's handled on the Qt thread.
 
 ## Extension points
 
-- **New STT backend**: implement the `SpeechToTextProvider` protocol (`transcribe(AudioBuffer, List[str]) -> Transcript`), add it to `STTProviderKind`, wire it in `app._build_dynamic_services`.
-- **New insertion strategy**: implement `TextInsertionProvider.insert(str)`. Candidates: UI Automation direct-text insertion, IME composition string.
-- **New language**: add the ISO 639-1 code to the Settings UI and `settings.languages`. The whisper provider will auto-switch to the multilingual model if any non-`en` language is present.
+- **New STT backend**: implement the `SpeechToTextProvider` protocol, add it to `STTProviderKind`, wire it in `app._build_dynamic_services`.
+- **New insertion strategy**: implement `TextInsertionProvider.insert(str)`.
+- **New language**: add the ISO 639-1 code to the Settings UI and `settings.languages`.

@@ -210,8 +210,6 @@ class SettingsWindow(QDialog):
         tabs.addTab(self._build_general_tab(), "General")
         tabs.addTab(self._build_microphone_tab(), "Microphone")
         tabs.addTab(self._build_hotkey_tab(), "Hotkey")
-        tabs.addTab(self._build_dictionary_tab(), "Dictionary")
-        tabs.addTab(self._build_snippets_tab(), "Snippets")
         tabs.addTab(self._build_advanced_tab(), "Advanced")
         layout.addWidget(tabs, 1)
 

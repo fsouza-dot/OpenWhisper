@@ -1,7 +1,7 @@
 # OpenWhisper
 
 **A local-first, privacy-respecting dictation assistant.**
-Hold a hotkey, speak, release — polished text lands in whatever app you were using.
+Hold a hotkey, speak, release — your text lands in whatever app you were using.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
@@ -22,7 +22,7 @@ OpenWhisper was **vibecoded in an afternoon** — built rapidly with AI assistan
 
 ## What It Does
 
-OpenWhisper sits in your system tray. Press **Alt+Space**, speak, release — your words appear as clean text in whatever app you're using. No clicking, no separate window, no friction.
+OpenWhisper sits in your system tray. Press **Alt+Space**, speak, release — your words appear as text in whatever app you're using. No clicking, no separate window, no friction.
 
 Built on [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) (local) or Groq's hosted `whisper-large-v3-turbo` (cloud). Works in every app via clipboard + synthesized `Ctrl+V`.
 
@@ -31,8 +31,6 @@ Built on [`faster-whisper`](https://github.com/SYSTRAN/faster-whisper) (local) o
 - **Global push-to-talk hotkey** (default **Alt+Space**) — works in every app
 - **Two STT backends** — local `faster-whisper` or Groq cloud (sub-second transcription)
 - **Multilingual** — English + Portuguese out of the box, easy to add more
-- **Personal dictionary** — names, jargon, product terms
-- **Snippets** — `/sig` expands to your signature, etc.
 - **Minimal UI** — tiny floating indicator while recording, otherwise invisible
 - **Privacy-first** — audio stays in RAM, API keys in system credential manager, zero telemetry
 
