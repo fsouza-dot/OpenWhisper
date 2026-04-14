@@ -69,6 +69,8 @@ See [Releases](../../releases) for standalone `.exe` builds. No Python required.
 4. Press **Alt+Space**, speak, release
 5. Your text appears wherever your cursor was
 
+For detailed usage instructions, see [USAGE.md](USAGE.md).
+
 ## Platform Roadmap
 
 | Platform | Status | Notes |
@@ -127,6 +129,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for setup instructions and guidelines.
 .\.venv\Scripts\python.exe -m PyInstaller --noconfirm OpenWhisper.spec
 # Output: dist\OpenWhisper\OpenWhisper.exe
 ```
+
+For detailed build instructions and project structure, see [BUILDING.md](BUILDING.md).
 
 ## License
 
