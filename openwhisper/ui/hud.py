@@ -1,27 +1,22 @@
-"""Minimal floating HUD - small, elegant pill overlay."""
+"""Minimal floating HUD - black background with white audio waveform lines."""
 from __future__ import annotations
 
 import math
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPainterPath
+from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen
 from PySide6.QtWidgets import QWidget
 
 from .ui_state import Phase, UIState
 
 
-_PHASE_COLORS: dict[Phase, QColor] = {
-    Phase.idle: QColor(100, 100, 105),
-    Phase.recording: QColor(255, 59, 48),      # Red
-    Phase.transcribing: QColor(50, 173, 230),  # Blue
-    Phase.cleaning: QColor(175, 130, 255),     # Purple
-    Phase.inserting: QColor(48, 209, 88),      # Green
-    Phase.error: QColor(255, 149, 0),          # Orange
-}
-
-
 class HUDWindow(QWidget):
-    """Tiny pill HUD with animated dots."""
+    """Simple HUD with animated audio waveform lines."""
+
+    NUM_BARS = 5        # Number of vertical bars
+    BAR_WIDTH = 3       # Width of each bar
+    BAR_GAP = 4         # Gap between bars
+    MAX_BAR_HEIGHT = 20 # Maximum bar height
 
     def __init__(self, state: UIState):
         super().__init__(
@@ -34,11 +29,11 @@ class HUDWindow(QWidget):
         self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
         self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating)
 
-        # Small and compact
-        self.setFixedSize(64, 28)
+        # Calculate size based on bars
+        total_width = self.NUM_BARS * self.BAR_WIDTH + (self.NUM_BARS - 1) * self.BAR_GAP + 24
+        self.setFixedSize(total_width, 36)
 
         self._phase = Phase.idle
-        self._color = _PHASE_COLORS[Phase.idle]
         self._time = 0
 
         # Animation
@@ -61,34 +56,31 @@ class HUDWindow(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        # Background pill
-        bg = QPainterPath()
-        r = self.rect().adjusted(1, 1, -1, -1)
-        bg.addRoundedRect(r, r.height() / 2, r.height() / 2)
-        p.fillPath(bg, QColor(28, 28, 30, 240))
+        # Black background with rounded corners
+        p.setBrush(QColor(0, 0, 0, 230))
+        p.setPen(Qt.PenStyle.NoPen)
+        p.drawRoundedRect(self.rect(), 8, 8)
 
-        # Draw 3 animated dots for recording, single dot otherwise
-        cx, cy = r.center().x(), r.center().y()
+        # Draw centered white waveform bars
+        cx = self.width() // 2
+        cy = self.height() // 2
 
-        if self._phase == Phase.recording:
-            # 3 bouncing dots
-            for i in range(3):
-                offset = math.sin(self._time / 150 + i * 0.8) * 4
-                x = cx - 12 + i * 12
-                y = cy + offset
-                p.setPen(Qt.PenStyle.NoPen)
-                p.setBrush(self._color)
-                p.drawEllipse(int(x) - 3, int(y) - 3, 6, 6)
-        else:
-            # Single pulsing dot
-            if self._phase in (Phase.transcribing, Phase.cleaning):
-                alpha = int(180 + 75 * math.sin(self._time / 150))
-                color = QColor(self._color.red(), self._color.green(), self._color.blue(), alpha)
-            else:
-                color = self._color
-            p.setPen(Qt.PenStyle.NoPen)
-            p.setBrush(color)
-            p.drawEllipse(int(cx) - 4, int(cy) - 4, 8, 8)
+        # Calculate total width of all bars
+        total_bars_width = self.NUM_BARS * self.BAR_WIDTH + (self.NUM_BARS - 1) * self.BAR_GAP
+        start_x = cx - total_bars_width // 2
+
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(QColor(255, 255, 255))
+
+        for i in range(self.NUM_BARS):
+            # Animate each bar with different phase offset
+            phase_offset = i * 0.7
+            height = 4 + abs(math.sin(self._time / 120 + phase_offset)) * (self.MAX_BAR_HEIGHT - 4)
+
+            x = start_x + i * (self.BAR_WIDTH + self.BAR_GAP)
+            y = cy - height / 2
+
+            p.drawRoundedRect(int(x), int(y), self.BAR_WIDTH, int(height), 1, 1)
 
     def showEvent(self, e) -> None:
         screen = QGuiApplication.primaryScreen()
@@ -99,11 +91,10 @@ class HUDWindow(QWidget):
 
     def _on_phase(self, phase: Phase, _msg: str) -> None:
         self._phase = phase
-        self._color = _PHASE_COLORS.get(phase, _PHASE_COLORS[Phase.idle])
 
         if phase == Phase.idle:
             self._timer.stop()
-            self._hide_timer.start(400)
+            self._hide_timer.start(50)  # Hide almost immediately
         else:
             self._hide_timer.stop()
             self._time = 0

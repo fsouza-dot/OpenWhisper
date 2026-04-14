@@ -202,7 +202,7 @@ class DictationCoordinator(QObject):
 
         log.info("Pipeline complete in %.2fs (used_llm=%s, model=%s)",
                  time.time() - t0, result.used_llm, result.model_used)
-        self._schedule_idle(700)
+        self._phase_signal.emit(Phase.idle, "")  # Hide immediately
 
     # ------------------------------------------------------------ commands
 

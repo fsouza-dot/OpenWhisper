@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..keyring_store import SecretStore
+from ..languages import WHISPER_LANGUAGES, get_language_display
 from ..usage import UsageTracker, UsageSnapshot
 from ..settings import (
     AppSettings,
@@ -158,6 +159,171 @@ class HotkeyCaptureButton(QPushButton):
         super().focusOutEvent(event)
 
 
+class LanguagePicker(QWidget):
+    """Dual-list language picker with arrow buttons.
+
+    Left list: available languages (searchable)
+    Right list: selected languages (max 3)
+    Arrow buttons to move languages between lists.
+    """
+
+    MAX_LANGUAGES = 3
+    changed = Signal()  # Emitted when selection changes
+
+    def __init__(self, selected_codes: list[str], parent: QWidget | None = None):
+        super().__init__(parent)
+        # Keep selected in order
+        self._selected: list[str] = list(selected_codes)[:self.MAX_LANGUAGES]
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+
+        # Main row: left column + buttons + right column
+        lists_row = QHBoxLayout()
+        lists_row.setSpacing(10)
+
+        # Left column: label + search + available list
+        left_col = QVBoxLayout()
+        left_col.setSpacing(4)
+        left_col.addWidget(QLabel("Available Languages"))
+        self._search = QLineEdit()
+        self._search.setPlaceholderText("Search...")
+        self._search.textChanged.connect(self._filter_available)
+        self._search.setClearButtonEnabled(True)
+        left_col.addWidget(self._search)
+        self._available_list = QListWidget()
+        self._available_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._available_list.setFixedHeight(120)
+        self._available_list.itemDoubleClicked.connect(self._add_selected_item)
+        left_col.addWidget(self._available_list)
+        lists_row.addLayout(left_col, 1)
+
+        # Middle: arrow buttons (vertically centered)
+        btn_col = QVBoxLayout()
+        btn_col.setSpacing(6)
+        btn_col.addStretch(1)
+        self._add_btn = QPushButton(">")
+        self._add_btn.setFixedSize(40, 30)
+        self._add_btn.clicked.connect(self._add_selected)
+        self._add_btn.setToolTip("Add language (or double-click)")
+        btn_col.addWidget(self._add_btn)
+        self._remove_btn = QPushButton("<")
+        self._remove_btn.setFixedSize(40, 30)
+        self._remove_btn.clicked.connect(self._remove_selected)
+        self._remove_btn.setToolTip("Remove language (or double-click)")
+        btn_col.addWidget(self._remove_btn)
+        btn_col.addStretch(1)
+        lists_row.addLayout(btn_col)
+
+        # Right column: label + selected list
+        right_col = QVBoxLayout()
+        right_col.setSpacing(4)
+        right_col.addWidget(QLabel("Selected (max 3)"))
+        # Add spacer to align with left list (search box takes ~30px)
+        right_col.addSpacing(30)
+        self._selected_list = QListWidget()
+        self._selected_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._selected_list.setFixedHeight(120)
+        self._selected_list.itemDoubleClicked.connect(self._remove_selected_item)
+        right_col.addWidget(self._selected_list)
+        lists_row.addLayout(right_col, 1)
+
+        layout.addLayout(lists_row)
+
+        # Status label
+        self._status = QLabel()
+        self._status.setStyleSheet("color: #888; font-size: 11px;")
+        layout.addWidget(self._status)
+
+        self._populate_lists()
+        self._update_status()
+
+    def _populate_lists(self) -> None:
+        """Fill both lists based on current selection."""
+        self._available_list.clear()
+        self._selected_list.clear()
+
+        # Available: all languages not in selected
+        for code, english, native in WHISPER_LANGUAGES:
+            if code not in self._selected:
+                item = QListWidgetItem(get_language_display(code))
+                item.setData(Qt.ItemDataRole.UserRole, code)
+                self._available_list.addItem(item)
+
+        # Selected: in order
+        for code in self._selected:
+            item = QListWidgetItem(get_language_display(code))
+            item.setData(Qt.ItemDataRole.UserRole, code)
+            self._selected_list.addItem(item)
+
+    def _filter_available(self, text: str) -> None:
+        """Filter available list by search text."""
+        text = text.lower().strip()
+        for i in range(self._available_list.count()):
+            item = self._available_list.item(i)
+            code = item.data(Qt.ItemDataRole.UserRole)
+            label = item.text().lower()
+            visible = not text or text in label or text in code.lower()
+            item.setHidden(not visible)
+
+    def _add_selected(self) -> None:
+        """Move selected item from available to selected list."""
+        item = self._available_list.currentItem()
+        if item:
+            self._add_selected_item(item)
+
+    def _add_selected_item(self, item: QListWidgetItem) -> None:
+        """Add a specific item to selected list."""
+        if len(self._selected) >= self.MAX_LANGUAGES:
+            return  # At limit
+        code = item.data(Qt.ItemDataRole.UserRole)
+        if code not in self._selected:
+            self._selected.append(code)
+            self._populate_lists()
+            self._update_status()
+            self.changed.emit()
+
+    def _remove_selected(self) -> None:
+        """Move selected item from selected back to available list."""
+        item = self._selected_list.currentItem()
+        if item:
+            self._remove_selected_item(item)
+
+    def _remove_selected_item(self, item: QListWidgetItem) -> None:
+        """Remove a specific item from selected list."""
+        code = item.data(Qt.ItemDataRole.UserRole)
+        if code in self._selected:
+            self._selected.remove(code)
+            self._populate_lists()
+            self._update_status()
+            self.changed.emit()
+
+    def _update_status(self) -> None:
+        """Update status label."""
+        count = len(self._selected)
+        remaining = self.MAX_LANGUAGES - count
+        if count == 0:
+            self._status.setText("Select at least one language (will default to English)")
+        elif count == 1:
+            self._status.setText(f"1 language selected (forced mode - fastest)")
+        else:
+            self._status.setText(f"{count} languages selected (auto-detect per utterance)")
+
+        # Disable add button at limit
+        self._add_btn.setEnabled(count < self.MAX_LANGUAGES)
+
+    def selected_languages(self) -> list[str]:
+        """Return list of selected language codes in selection order."""
+        return list(self._selected)
+
+    def set_selected(self, codes: list[str]) -> None:
+        """Set the selected languages programmatically."""
+        self._selected = list(codes)[:self.MAX_LANGUAGES]
+        self._populate_lists()
+        self._update_status()
+
+
 _COMPACT_QSS = """
 QLineEdit, QComboBox, QSpinBox {
     padding: 4px 8px;
@@ -235,26 +401,16 @@ class SettingsWindow(QDialog):
         )
         form.addRow("Dictation mode", self._mode_combo)
 
-        # Language checkboxes. Exactly one language = forced; multiple =
-        # auto-detect per utterance.
-        self._lang_en = QCheckBox("English")
-        self._lang_pt = QCheckBox("Portuguese (Brazil)")
-        self._lang_en.setChecked("en" in self._draft.languages)
-        self._lang_pt.setChecked("pt" in self._draft.languages)
-        lang_row = QHBoxLayout()
-        lang_row.addWidget(self._lang_en)
-        lang_row.addWidget(self._lang_pt)
-        lang_row.addStretch(1)
-        lang_row_w = QWidget()
-        lang_row_w.setLayout(lang_row)
-        form.addRow("Languages", lang_row_w)
+        # Searchable multi-language picker. Single language = forced (fastest);
+        # multiple = Whisper auto-detects per utterance.
+        form.addRow(QLabel("Languages"))
+        self._language_picker = LanguagePicker(self._draft.languages)
+        form.addRow(self._language_picker)
         form.addRow(
-            "",
             self._caption(
-                "Enable multiple to auto-detect per utterance. Enabling any"
-                " non-English language auto-switches to the multilingual"
-                " whisper model."
-            ),
+                "Single language is forced (fastest). "
+                "Multiple languages enable auto-detection per utterance."
+            )
         )
 
         self._stt_combo = QComboBox()
@@ -751,14 +907,10 @@ class SettingsWindow(QDialog):
     def _save(self) -> None:
         try:
             self._draft.input_device = self._mic_combo.currentData()
-            langs: list[str] = []
-            if self._lang_en.isChecked():
-                langs.append("en")
-            if self._lang_pt.isChecked():
-                langs.append("pt")
+            langs = self._language_picker.selected_languages()
             if not langs:  # never leave it empty — fall back to English
                 langs = ["en"]
-                self._lang_en.setChecked(True)
+                self._language_picker.set_selected(["en"])
             self._draft.languages = langs
             self._draft.dictation_mode = self._mode_combo.currentData()
             self._draft.stt_provider = self._stt_combo.currentData()
