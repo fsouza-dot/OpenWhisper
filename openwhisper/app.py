@@ -21,7 +21,7 @@ from .config import app_data_dir, asset_path
 from .coordinator import DictationCoordinator
 from .history import DictationHistory
 from .hotkey.hotkey_manager import HotkeyManager
-from .insertion.paste_inserter import PasteboardInserter
+from .platform import get_platform
 from .keyring_store import SecretStore
 from .logging_setup import get_logger, setup_logging
 from .protocols import SpeechToTextProvider
@@ -59,7 +59,8 @@ class OpenWhisperApp(QObject):
             lambda s: self.recorder.set_device(s.input_device)
         )
         self.hotkey = HotkeyManager()
-        self.inserter = PasteboardInserter(
+        self._platform = get_platform()
+        self.inserter = self._platform.create_inserter(
             restore_clipboard=self.settings_store.settings.restore_clipboard
         )
 

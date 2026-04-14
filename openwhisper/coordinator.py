@@ -20,7 +20,6 @@ from .commands.command import DictationCommand
 from .errors import OpenWhisperError
 from .history import DictationHistory, HistoryEntry
 from .hotkey.hotkey_manager import HotkeyEvent, HotkeyManager
-from .insertion.paste_inserter import PasteboardInserter
 from .logging_setup import get_logger
 from .protocols import AudioBuffer, SpeechToTextProvider, TextInsertionProvider
 from .audio.recorder import AudioRecorder
@@ -217,8 +216,6 @@ class DictationCoordinator(QObject):
             return
 
         paster = self._inserter
-        if not isinstance(paster, PasteboardInserter):
-            return
 
         try:
             if cmd == DictationCommand.new_line:
@@ -230,13 +227,17 @@ class DictationCoordinator(QObject):
             elif cmd == DictationCommand.numbered_list:
                 paster.insert("\n1. ")
             elif cmd == DictationCommand.press_enter or cmd == DictationCommand.send:
-                paster.press_key("enter")
+                if hasattr(paster, "press_key"):
+                    paster.press_key("enter")
             elif cmd == DictationCommand.press_tab:
-                paster.press_key("tab")
+                if hasattr(paster, "press_key"):
+                    paster.press_key("tab")
             elif cmd == DictationCommand.press_escape:
-                paster.press_key("escape")
+                if hasattr(paster, "press_key"):
+                    paster.press_key("escape")
             elif cmd == DictationCommand.delete_last:
-                paster.press_key("backspace")
+                if hasattr(paster, "press_key"):
+                    paster.press_key("backspace")
             elif cmd == DictationCommand.undo_last_dictation:
                 self._undo_last()
             # rewrite_* commands are reflected in `result.cleaned` already.
@@ -248,7 +249,7 @@ class DictationCoordinator(QObject):
         if last is None:
             return
         paster = self._inserter
-        if not isinstance(paster, PasteboardInserter):
+        if not hasattr(paster, "press_key"):
             return
         # Best-effort: spam backspace equal to the inserted length.
         for _ in range(len(last.final_text)):
@@ -274,25 +275,13 @@ class DictationCoordinator(QObject):
 
 
 def _frontmost_app_name() -> Optional[str]:
-    """Best-effort Windows foreground window lookup. Falls back to None
-    on any error so the coordinator never breaks on a missing dep."""
+    """Get the name of the currently focused application.
+
+    Uses the platform module for cross-platform support.
+    Falls back to None on any error so the coordinator never breaks.
+    """
     try:
-        import ctypes  # type: ignore
-        user32 = ctypes.windll.user32
-        kernel32 = ctypes.windll.kernel32
-        hwnd = user32.GetForegroundWindow()
-        pid = ctypes.c_ulong()
-        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid.value)
-        if not handle:
-            return None
-        buf = ctypes.create_unicode_buffer(512)
-        size = ctypes.c_ulong(len(buf))
-        ok = kernel32.QueryFullProcessImageNameW(handle, 0, buf, ctypes.byref(size))
-        kernel32.CloseHandle(handle)
-        if not ok:
-            return None
-        return buf.value.split("\\")[-1]
+        from .platform import get_platform
+        return get_platform().get_foreground_app()
     except Exception:
         return None
