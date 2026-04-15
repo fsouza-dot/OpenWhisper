@@ -8,7 +8,11 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-datas = [("assets/icon.ico", "assets"), ("assets/icon.png", "assets")]
+datas = [
+    ("assets/icon.ico", "assets"),
+    ("assets/icon.png", "assets"),
+    ("openwhisper/resources/flags", "openwhisper/resources/flags"),
+]
 binaries = []
 hiddenimports = []
 

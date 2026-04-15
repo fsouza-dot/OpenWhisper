@@ -23,7 +23,11 @@ def app_data_dir() -> Path:
     if sys.platform.startswith("win"):
         base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
         path = Path(base) / APP_NAME
+    elif sys.platform == "darwin":
+        # macOS: use ~/Library/Application Support/
+        path = Path.home() / "Library" / "Application Support" / APP_NAME
     else:
+        # Linux and others
         path = Path.home() / ".local" / "share" / APP_NAME
     path.mkdir(parents=True, exist_ok=True)
     return path
