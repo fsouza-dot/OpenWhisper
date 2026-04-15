@@ -30,7 +30,6 @@ from .stt.groq_provider import GroqWhisperProvider
 from .stt.whisper_provider import FasterWhisperProvider
 from .usage import UsageTracker
 from .ui.hud import HUDWindow
-from .ui.onboarding import OnboardingDialog
 from .ui.settings_window import SettingsWindow
 from .ui.tray import TrayIcon
 from .ui.ui_state import Phase, UIState
@@ -83,12 +82,10 @@ class OpenWhisperApp(QObject):
         self.tray = TrayIcon(
             state=self.ui_state,
             on_open_settings=self.show_settings,
-            on_open_onboarding=self.show_onboarding,
             on_quit=self.quit,
         )
         self.tray.show()
         self._settings_window: Optional[SettingsWindow] = None
-        self._onboarding_window: Optional[OnboardingDialog] = None
 
         # ---- start
         self.coordinator.start()
@@ -103,8 +100,8 @@ class OpenWhisperApp(QObject):
         )
 
         if not self.secrets.get_groq_key():
-            # First-run: no key yet. Show onboarding.
-            self.show_onboarding()
+            # First-run: no key yet. Show settings.
+            self.show_settings()
 
     # -------------------------------------------------- dynamic service build
 
@@ -158,13 +155,6 @@ class OpenWhisperApp(QObject):
             secrets=self.secrets,
             usage=self.usage,
             on_save=self._on_settings_saved,
-        )
-        dlg.exec()
-
-    def show_onboarding(self) -> None:
-        dlg = OnboardingDialog(
-            secrets=self.secrets,
-            on_done=self._on_settings_saved,
         )
         dlg.exec()
 

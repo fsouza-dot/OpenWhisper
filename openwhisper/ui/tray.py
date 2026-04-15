@@ -1,4 +1,4 @@
-"""System tray icon. Exposes Settings / Onboarding / Quit, and reflects
+"""System tray icon. Exposes Settings / Quit, and reflects
 the current phase via icon color."""
 from __future__ import annotations
 
@@ -41,7 +41,6 @@ class TrayIcon(QSystemTrayIcon):
         self,
         state: UIState,
         on_open_settings: Callable[[], None],
-        on_open_onboarding: Callable[[], None],
         on_quit: Callable[[], None],
     ):
         super().__init__(_make_dot_icon(_PHASE_COLORS[Phase.idle]))
@@ -54,13 +53,9 @@ class TrayIcon(QSystemTrayIcon):
         menu.addAction(title)
         menu.addSeparator()
 
-        settings_action = QAction("Settings…", menu)
+        settings_action = QAction("Settings...", menu)
         settings_action.triggered.connect(on_open_settings)
         menu.addAction(settings_action)
-
-        onboarding_action = QAction("Onboarding / Setup…", menu)
-        onboarding_action.triggered.connect(on_open_onboarding)
-        menu.addAction(onboarding_action)
 
         menu.addSeparator()
         quit_action = QAction("Quit", menu)

@@ -449,13 +449,38 @@ class LanguagePicker(QWidget):
         btn_col = QVBoxLayout()
         btn_col.setSpacing(8)
         btn_col.addStretch(1)
-        self._add_btn = QPushButton(">")
-        self._add_btn.setFixedSize(40, 32)
-        self._add_btn.setObjectName("accentButton")
+        self._add_btn = QPushButton("\u2192")  # Right arrow
+        self._add_btn.setFixedSize(44, 36)
+        self._add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+                border: none;
+                border-radius: 4px;
+                font-size: 18px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7ed6ff;
+            }}
+        """)
         self._add_btn.clicked.connect(self._add_selected)
         btn_col.addWidget(self._add_btn)
-        self._remove_btn = QPushButton("<")
-        self._remove_btn.setFixedSize(40, 32)
+        self._remove_btn = QPushButton("\u2190")  # Left arrow
+        self._remove_btn.setFixedSize(44, 36)
+        self._remove_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                color: #ffffff;
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 4px;
+                font-size: 18px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
         self._remove_btn.clicked.connect(self._remove_selected)
         btn_col.addWidget(self._remove_btn)
         btn_col.addStretch(1)
@@ -701,16 +726,39 @@ class SettingsWindow(QDialog):
         self._pages.addWidget(self._build_advanced_page())
         content_layout.addWidget(self._pages, 1)
 
-        # Footer with save/cancel
-        footer = self._build_footer()
-        content_layout.addWidget(footer)
-
         main_layout.addWidget(content_container, 1)
 
         # State for mic test
         self._test_recording: np.ndarray | None = None
         self._test_stream: sd.InputStream | None = None
         self._test_chunks: list[np.ndarray] = []
+
+        # Connect all controls to auto-save
+        self._connect_auto_save()
+
+    def _connect_auto_save(self) -> None:
+        """Connect all settings controls to auto-save on change."""
+        # General page
+        self._mode_combo.currentIndexChanged.connect(self._auto_save)
+        self._language_picker.changed.connect(self._auto_save)
+        self._stt_combo.currentIndexChanged.connect(self._auto_save)
+        self._groq_key_field.editingFinished.connect(self._auto_save)
+        self._whisper_size.currentIndexChanged.connect(self._auto_save)
+        self._whisper_compute.currentIndexChanged.connect(self._auto_save)
+
+        # Microphone page
+        self._mic_combo.currentIndexChanged.connect(self._auto_save)
+
+        # Hotkey page
+        self._hotkey_mode.currentIndexChanged.connect(self._auto_save)
+        self._command_mode.currentIndexChanged.connect(self._auto_save)
+        self._confirm_destructive.stateChanged.connect(self._auto_save)
+
+        # Advanced page
+        self._paste_behavior.currentIndexChanged.connect(self._auto_save)
+        self._restore_clipboard.stateChanged.connect(self._auto_save)
+        self._save_audio_history.stateChanged.connect(self._auto_save)
+        self._history_size.valueChanged.connect(self._auto_save)
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -769,27 +817,6 @@ class SettingsWindow(QDialog):
         self._pages.setCurrentIndex(idx)
         for i, item in enumerate(self._nav_items):
             item.setChecked(i == idx)
-
-    def _build_footer(self) -> QWidget:
-        footer = QWidget()
-        footer.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_content']};")
-        layout = QHBoxLayout(footer)
-        layout.setContentsMargins(24, 16, 24, 16)
-
-        layout.addStretch(1)
-
-        cancel_btn = QPushButton("Cancel")
-        cancel_btn.setFixedWidth(100)
-        cancel_btn.clicked.connect(self.reject)
-        layout.addWidget(cancel_btn)
-
-        save_btn = QPushButton("Save")
-        save_btn.setObjectName("accentButton")
-        save_btn.setFixedWidth(100)
-        save_btn.clicked.connect(self._save)
-        layout.addWidget(save_btn)
-
-        return footer
 
     def _create_page(self, title: str, subtitle: str = "") -> tuple[QWidget, QVBoxLayout]:
         """Create a scrollable page with header."""
@@ -1236,11 +1263,13 @@ class SettingsWindow(QDialog):
             if self._bindings_list.item(i).data(Qt.ItemDataRole.UserRole) == payload:
                 return
         self._append_binding_item(binding)
+        self._auto_save()
 
     def _remove_selected_binding(self) -> None:
         row = self._bindings_list.currentRow()
         if row >= 0:
             self._bindings_list.takeItem(row)
+            self._auto_save()
 
     # =========================================================== Advanced
 
@@ -1325,13 +1354,13 @@ class SettingsWindow(QDialog):
 
     # =================================================================== save
 
-    def _save(self) -> None:
+    def _auto_save(self) -> None:
+        """Save settings automatically when any control changes."""
         try:
             self._draft.input_device = self._mic_combo.currentData()
             langs = self._language_picker.selected_languages()
             if not langs:
                 langs = ["en"]
-                self._language_picker.set_selected(["en"])
             self._draft.languages = langs
             self._draft.dictation_mode = self._mode_combo.currentData()
             self._draft.stt_provider = self._stt_combo.currentData()
@@ -1356,6 +1385,5 @@ class SettingsWindow(QDialog):
 
             self._store.replace(self._draft)
             self._on_save()
-            self.accept()
-        except Exception as exc:
-            QMessageBox.critical(self, "Save failed", str(exc))
+        except Exception:
+            pass  # Silently ignore auto-save errors
