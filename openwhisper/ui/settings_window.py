@@ -1,5 +1,5 @@
-"""Settings dialog with five tabs: General, Hotkey, Dictionary, Snippets,
-Advanced. Works on a draft copy of `AppSettings` so the user can cancel.
+"""Settings dialog with Windows 11-style left navigation and card-based layout.
+Works on a draft copy of `AppSettings` so the user can cancel.
 """
 from __future__ import annotations
 
@@ -8,12 +8,12 @@ from typing import Callable
 import numpy as np
 import sounddevice as sd
 from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtGui import QFont
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
-    QFormLayout,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -22,9 +22,9 @@ from PySide6.QtWidgets import (
     QMessageBox,
     QProgressBar,
     QPushButton,
+    QScrollArea,
     QSpinBox,
-    QTabWidget,
-    QTextEdit,
+    QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
@@ -46,7 +46,7 @@ from ..settings import (
 )
 
 
-# Qt.Key → pynput-style key name, for chord capture.
+# Qt.Key -> pynput-style key name, for chord capture.
 _QT_KEY_NAMES: dict[int, str] = {
     int(Qt.Key.Key_Space): "space",
     int(Qt.Key.Key_Tab): "tab",
@@ -85,14 +85,165 @@ def _qt_key_to_name(key: int) -> str | None:
     return None
 
 
+# ==================== Windows 11 Style Constants ====================
+
+_WIN11_COLORS = {
+    "bg_window": "#202020",
+    "bg_sidebar": "#1a1a1a",
+    "bg_content": "#2d2d2d",
+    "bg_card": "#3a3a3a",
+    "bg_card_hover": "#404040",
+    "bg_nav_selected": "#3a3a3a",
+    "bg_nav_hover": "#2a2a2a",
+    "text_primary": "#ffffff",
+    "text_secondary": "#9d9d9d",
+    "text_dim": "#6d6d6d",
+    "accent": "#60cdff",
+    "border": "#454545",
+    "input_bg": "#323232",
+}
+
+_WIN11_QSS = f"""
+QDialog {{
+    background-color: {_WIN11_COLORS["bg_window"]};
+    color: {_WIN11_COLORS["text_primary"]};
+}}
+QLabel {{
+    color: {_WIN11_COLORS["text_primary"]};
+    background: transparent;
+}}
+QLineEdit, QComboBox, QSpinBox {{
+    background-color: {_WIN11_COLORS["input_bg"]};
+    color: {_WIN11_COLORS["text_primary"]};
+    border: 1px solid {_WIN11_COLORS["border"]};
+    border-radius: 4px;
+    padding: 6px 10px;
+    min-height: 20px;
+}}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus {{
+    border: 1px solid {_WIN11_COLORS["accent"]};
+}}
+QComboBox::drop-down {{
+    border: none;
+    width: 24px;
+}}
+QComboBox::down-arrow {{
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid {_WIN11_COLORS["text_secondary"]};
+    margin-right: 8px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: {_WIN11_COLORS["bg_card"]};
+    color: {_WIN11_COLORS["text_primary"]};
+    selection-background-color: {_WIN11_COLORS["accent"]};
+    border: 1px solid {_WIN11_COLORS["border"]};
+    border-radius: 4px;
+}}
+QPushButton {{
+    background-color: {_WIN11_COLORS["bg_card"]};
+    color: {_WIN11_COLORS["text_primary"]};
+    border: 1px solid {_WIN11_COLORS["border"]};
+    border-radius: 4px;
+    padding: 6px 16px;
+    min-height: 24px;
+}}
+QPushButton:hover {{
+    background-color: {_WIN11_COLORS["bg_card_hover"]};
+}}
+QPushButton:pressed {{
+    background-color: {_WIN11_COLORS["bg_nav_selected"]};
+}}
+QPushButton#accentButton {{
+    background-color: {_WIN11_COLORS["accent"]};
+    color: #000000;
+    border: none;
+}}
+QPushButton#accentButton:hover {{
+    background-color: #7ed6ff;
+}}
+QCheckBox {{
+    color: {_WIN11_COLORS["text_primary"]};
+    spacing: 8px;
+}}
+QCheckBox::indicator {{
+    width: 18px;
+    height: 18px;
+    border-radius: 3px;
+    border: 2px solid {_WIN11_COLORS["text_secondary"]};
+    background-color: transparent;
+}}
+QCheckBox::indicator:checked {{
+    background-color: {_WIN11_COLORS["accent"]};
+    border-color: {_WIN11_COLORS["accent"]};
+}}
+QProgressBar {{
+    border: 1px solid {_WIN11_COLORS["border"]};
+    border-radius: 4px;
+    background: {_WIN11_COLORS["input_bg"]};
+    text-align: center;
+    color: {_WIN11_COLORS["text_primary"]};
+    height: 8px;
+}}
+QProgressBar::chunk {{
+    background-color: {_WIN11_COLORS["accent"]};
+    border-radius: 3px;
+}}
+QScrollArea {{
+    background-color: transparent;
+    border: none;
+}}
+QScrollBar:vertical {{
+    background-color: transparent;
+    width: 8px;
+    margin: 0;
+}}
+QScrollBar::handle:vertical {{
+    background-color: {_WIN11_COLORS["text_dim"]};
+    border-radius: 4px;
+    min-height: 30px;
+}}
+QScrollBar::handle:vertical:hover {{
+    background-color: {_WIN11_COLORS["text_secondary"]};
+}}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0;
+}}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{
+    background: none;
+}}
+QListWidget {{
+    background-color: {_WIN11_COLORS["input_bg"]};
+    color: {_WIN11_COLORS["text_primary"]};
+    border: 1px solid {_WIN11_COLORS["border"]};
+    border-radius: 4px;
+    outline: none;
+}}
+QListWidget::item {{
+    padding: 6px 10px;
+    border-radius: 4px;
+}}
+QListWidget::item:selected {{
+    background-color: {_WIN11_COLORS["accent"]};
+    color: #000000;
+}}
+QListWidget::item:hover:!selected {{
+    background-color: {_WIN11_COLORS["bg_card_hover"]};
+}}
+"""
+
+
+# ==================== Helper Widgets ====================
+
 class HotkeyCaptureButton(QPushButton):
-    """Click, then press a key combination — emits `captured` with the
+    """Click, then press a key combination - emits `captured` with the
     resulting HotkeyBinding. Escape cancels."""
 
     captured = Signal(object)  # HotkeyBinding
 
-    _IDLE_LABEL = "Record new binding…"
-    _CAPTURING_LABEL = "Press a key combination  (Esc to cancel)"
+    _IDLE_LABEL = "Record new binding..."
+    _CAPTURING_LABEL = "Press a key combination (Esc to cancel)"
 
     def __init__(self, parent: QWidget | None = None):
         super().__init__(self._IDLE_LABEL, parent)
@@ -160,33 +311,28 @@ class HotkeyCaptureButton(QPushButton):
 
 
 class LanguagePicker(QWidget):
-    """Dual-list language picker with arrow buttons.
-
-    Left list: available languages (searchable)
-    Right list: selected languages (max 3)
-    Arrow buttons to move languages between lists.
-    """
+    """Dual-list language picker with arrow buttons."""
 
     MAX_LANGUAGES = 3
-    changed = Signal()  # Emitted when selection changes
+    changed = Signal()
 
     def __init__(self, selected_codes: list[str], parent: QWidget | None = None):
         super().__init__(parent)
-        # Keep selected in order
         self._selected: list[str] = list(selected_codes)[:self.MAX_LANGUAGES]
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setSpacing(8)
 
-        # Main row: left column + buttons + right column
         lists_row = QHBoxLayout()
-        lists_row.setSpacing(10)
+        lists_row.setSpacing(12)
 
-        # Left column: label + search + available list
+        # Left column
         left_col = QVBoxLayout()
-        left_col.setSpacing(4)
-        left_col.addWidget(QLabel("Available Languages"))
+        left_col.setSpacing(6)
+        lbl = QLabel("Available Languages")
+        lbl.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        left_col.addWidget(lbl)
         self._search = QLineEdit()
         self._search.setPlaceholderText("Search...")
         self._search.textChanged.connect(self._filter_available)
@@ -194,71 +340,63 @@ class LanguagePicker(QWidget):
         left_col.addWidget(self._search)
         self._available_list = QListWidget()
         self._available_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._available_list.setFixedHeight(120)
+        self._available_list.setFixedHeight(140)
         self._available_list.itemDoubleClicked.connect(self._add_selected_item)
         left_col.addWidget(self._available_list)
         lists_row.addLayout(left_col, 1)
 
-        # Middle: arrow buttons (vertically centered)
+        # Middle buttons
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(6)
+        btn_col.setSpacing(8)
         btn_col.addStretch(1)
         self._add_btn = QPushButton(">")
-        self._add_btn.setFixedSize(40, 30)
+        self._add_btn.setFixedSize(36, 30)
         self._add_btn.clicked.connect(self._add_selected)
-        self._add_btn.setToolTip("Add language (or double-click)")
         btn_col.addWidget(self._add_btn)
         self._remove_btn = QPushButton("<")
-        self._remove_btn.setFixedSize(40, 30)
+        self._remove_btn.setFixedSize(36, 30)
         self._remove_btn.clicked.connect(self._remove_selected)
-        self._remove_btn.setToolTip("Remove language (or double-click)")
         btn_col.addWidget(self._remove_btn)
         btn_col.addStretch(1)
         lists_row.addLayout(btn_col)
 
-        # Right column: label + selected list
+        # Right column
         right_col = QVBoxLayout()
-        right_col.setSpacing(4)
-        right_col.addWidget(QLabel("Selected (max 3)"))
-        # Add spacer to align with left list (search box takes ~30px)
-        right_col.addSpacing(30)
+        right_col.setSpacing(6)
+        lbl2 = QLabel("Selected (max 3)")
+        lbl2.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        right_col.addWidget(lbl2)
+        right_col.addSpacing(32)
         self._selected_list = QListWidget()
         self._selected_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._selected_list.setFixedHeight(120)
+        self._selected_list.setFixedHeight(140)
         self._selected_list.itemDoubleClicked.connect(self._remove_selected_item)
         right_col.addWidget(self._selected_list)
         lists_row.addLayout(right_col, 1)
 
         layout.addLayout(lists_row)
 
-        # Status label
         self._status = QLabel()
-        self._status.setStyleSheet("color: #888; font-size: 11px;")
+        self._status.setStyleSheet(f"color: {_WIN11_COLORS['text_dim']}; font-size: 11px;")
         layout.addWidget(self._status)
 
         self._populate_lists()
         self._update_status()
 
     def _populate_lists(self) -> None:
-        """Fill both lists based on current selection."""
         self._available_list.clear()
         self._selected_list.clear()
-
-        # Available: all languages not in selected
         for code, english, native in WHISPER_LANGUAGES:
             if code not in self._selected:
                 item = QListWidgetItem(get_language_display(code))
                 item.setData(Qt.ItemDataRole.UserRole, code)
                 self._available_list.addItem(item)
-
-        # Selected: in order
         for code in self._selected:
             item = QListWidgetItem(get_language_display(code))
             item.setData(Qt.ItemDataRole.UserRole, code)
             self._selected_list.addItem(item)
 
     def _filter_available(self, text: str) -> None:
-        """Filter available list by search text."""
         text = text.lower().strip()
         for i in range(self._available_list.count()):
             item = self._available_list.item(i)
@@ -268,15 +406,13 @@ class LanguagePicker(QWidget):
             item.setHidden(not visible)
 
     def _add_selected(self) -> None:
-        """Move selected item from available to selected list."""
         item = self._available_list.currentItem()
         if item:
             self._add_selected_item(item)
 
     def _add_selected_item(self, item: QListWidgetItem) -> None:
-        """Add a specific item to selected list."""
         if len(self._selected) >= self.MAX_LANGUAGES:
-            return  # At limit
+            return
         code = item.data(Qt.ItemDataRole.UserRole)
         if code not in self._selected:
             self._selected.append(code)
@@ -285,13 +421,11 @@ class LanguagePicker(QWidget):
             self.changed.emit()
 
     def _remove_selected(self) -> None:
-        """Move selected item from selected back to available list."""
         item = self._selected_list.currentItem()
         if item:
             self._remove_selected_item(item)
 
     def _remove_selected_item(self, item: QListWidgetItem) -> None:
-        """Remove a specific item from selected list."""
         code = item.data(Qt.ItemDataRole.UserRole)
         if code in self._selected:
             self._selected.remove(code)
@@ -300,55 +434,122 @@ class LanguagePicker(QWidget):
             self.changed.emit()
 
     def _update_status(self) -> None:
-        """Update status label."""
         count = len(self._selected)
-        remaining = self.MAX_LANGUAGES - count
         if count == 0:
             self._status.setText("Select at least one language (will default to English)")
         elif count == 1:
-            self._status.setText(f"1 language selected (forced mode - fastest)")
+            self._status.setText("1 language selected (forced mode - fastest)")
         else:
             self._status.setText(f"{count} languages selected (auto-detect per utterance)")
-
-        # Disable add button at limit
         self._add_btn.setEnabled(count < self.MAX_LANGUAGES)
 
     def selected_languages(self) -> list[str]:
-        """Return list of selected language codes in selection order."""
         return list(self._selected)
 
     def set_selected(self, codes: list[str]) -> None:
-        """Set the selected languages programmatically."""
         self._selected = list(codes)[:self.MAX_LANGUAGES]
         self._populate_lists()
         self._update_status()
 
 
-_COMPACT_QSS = """
-QLineEdit, QComboBox, QSpinBox {
-    padding: 4px 8px;
-    min-height: 26px;
-}
-QPushButton {
-    padding: 5px 14px;
-    min-height: 26px;
-}
-QCheckBox { spacing: 6px; min-height: 22px; }
-QTabBar::tab {
-    padding: 6px 14px;
-    min-height: 22px;
-}
-"""
+class SettingCard(QFrame):
+    """A Windows 11-style setting card with title, description, and control."""
+
+    def __init__(
+        self,
+        title: str,
+        description: str = "",
+        control: QWidget | None = None,
+        parent: QWidget | None = None
+    ):
+        super().__init__(parent)
+        self.setObjectName("settingCard")
+        self.setStyleSheet(f"""
+            QFrame#settingCard {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border-radius: 6px;
+                padding: 4px;
+            }}
+            QFrame#settingCard:hover {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setSpacing(12)
+
+        # Text section
+        text_layout = QVBoxLayout()
+        text_layout.setSpacing(2)
+        text_layout.setContentsMargins(0, 0, 0, 0)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        text_layout.addWidget(title_label)
+
+        if description:
+            desc_label = QLabel(description)
+            desc_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+            desc_label.setWordWrap(True)
+            text_layout.addWidget(desc_label)
+
+        layout.addLayout(text_layout, 1)
+
+        if control:
+            layout.addWidget(control)
 
 
-def _tighten_form(form: QFormLayout) -> None:
-    """Shared spacing for every form layout in the dialog."""
-    form.setContentsMargins(12, 12, 12, 12)
-    form.setHorizontalSpacing(14)
-    form.setVerticalSpacing(10)
-    form.setLabelAlignment(Qt.AlignmentFlag.AlignLeft)
-    form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.ExpandingFieldsGrow)
+class SectionHeader(QLabel):
+    """A Windows 11-style section header."""
 
+    def __init__(self, text: str, parent: QWidget | None = None):
+        super().__init__(text, parent)
+        self.setStyleSheet(f"""
+            color: {_WIN11_COLORS["text_primary"]};
+            font-size: 14px;
+            font-weight: 600;
+            padding: 8px 0 4px 0;
+        """)
+
+
+class NavItem(QPushButton):
+    """A sidebar navigation item."""
+
+    def __init__(self, icon: str, text: str, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setText(f"  {icon}  {text}")
+        self.setCheckable(True)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.setFixedHeight(40)
+        self._update_style(False)
+
+    def _update_style(self, selected: bool) -> None:
+        if selected:
+            bg = _WIN11_COLORS["bg_nav_selected"]
+        else:
+            bg = "transparent"
+        self.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {bg};
+                color: {_WIN11_COLORS["text_primary"]};
+                border: none;
+                border-radius: 6px;
+                text-align: left;
+                padding-left: 12px;
+                font-size: 13px;
+            }}
+            QPushButton:hover {{
+                background-color: {_WIN11_COLORS["bg_nav_hover"]};
+            }}
+        """)
+
+    def setChecked(self, checked: bool) -> None:  # noqa: N802
+        super().setChecked(checked)
+        self._update_style(checked)
+
+
+# ==================== Main Settings Window ====================
 
 class SettingsWindow(QDialog):
     def __init__(
@@ -359,170 +560,371 @@ class SettingsWindow(QDialog):
         on_save: Callable[[], None],
     ):
         super().__init__()
-        self.setWindowTitle("OpenWhisper Settings")
-        self.setMinimumSize(640, 520)
-        self.resize(720, 560)
-        self.setStyleSheet(_COMPACT_QSS)
+        self.setWindowTitle("Settings")
+        self.setMinimumSize(800, 580)
+        self.resize(900, 640)
+        self.setStyleSheet(_WIN11_QSS)
+
         self._store = store
         self._secrets = secrets
         self._usage = usage
         self._on_save = on_save
         self._draft: AppSettings = store.settings.model_copy(deep=True)
 
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(8)
-        tabs = QTabWidget(self)
-        tabs.addTab(self._build_general_tab(), "General")
-        tabs.addTab(self._build_microphone_tab(), "Microphone")
-        tabs.addTab(self._build_hotkey_tab(), "Hotkey")
-        tabs.addTab(self._build_advanced_tab(), "Advanced")
-        layout.addWidget(tabs, 1)
+        main_layout = QHBoxLayout(self)
+        main_layout.setContentsMargins(0, 0, 0, 0)
+        main_layout.setSpacing(0)
 
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(self._save)
-        buttons.rejected.connect(self.reject)
-        layout.addWidget(buttons)
+        # Sidebar
+        sidebar = self._build_sidebar()
+        main_layout.addWidget(sidebar)
+
+        # Content area
+        content_container = QWidget()
+        content_container.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_content']};")
+        content_layout = QVBoxLayout(content_container)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(0)
+
+        # Stacked pages
+        self._pages = QStackedWidget()
+        self._pages.addWidget(self._build_general_page())
+        self._pages.addWidget(self._build_microphone_page())
+        self._pages.addWidget(self._build_hotkey_page())
+        self._pages.addWidget(self._build_advanced_page())
+        content_layout.addWidget(self._pages, 1)
+
+        # Footer with save/cancel
+        footer = self._build_footer()
+        content_layout.addWidget(footer)
+
+        main_layout.addWidget(content_container, 1)
+
+        # State for mic test
+        self._test_recording: np.ndarray | None = None
+        self._test_stream: sd.InputStream | None = None
+        self._test_chunks: list[np.ndarray] = []
+
+    def _build_sidebar(self) -> QWidget:
+        sidebar = QWidget()
+        sidebar.setFixedWidth(220)
+        sidebar.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_sidebar']};")
+
+        layout = QVBoxLayout(sidebar)
+        layout.setContentsMargins(12, 20, 12, 20)
+        layout.setSpacing(4)
+
+        # Title
+        title = QLabel("Settings")
+        title.setStyleSheet(f"""
+            color: {_WIN11_COLORS["text_primary"]};
+            font-size: 20px;
+            font-weight: 600;
+            padding: 0 0 20px 8px;
+        """)
+        layout.addWidget(title)
+
+        # Nav items
+        self._nav_items: list[NavItem] = []
+        nav_data = [
+            ("General", 0),
+            ("Microphone", 1),
+            ("Hotkey", 2),
+            ("Advanced", 3),
+        ]
+
+        for text, page_idx in nav_data:
+            icon = self._get_nav_icon(text)
+            item = NavItem(icon, text)
+            item.clicked.connect(lambda checked, idx=page_idx: self._switch_page(idx))
+            self._nav_items.append(item)
+            layout.addWidget(item)
+
+        layout.addStretch(1)
+
+        # Set first page active
+        self._nav_items[0].setChecked(True)
+
+        return sidebar
+
+    def _get_nav_icon(self, name: str) -> str:
+        icons = {
+            "General": "\u2699",     # gear
+            "Microphone": "\U0001F3A4",  # microphone
+            "Hotkey": "\u2328",      # keyboard
+            "Advanced": "\u2699",    # gear (different)
+        }
+        return icons.get(name, "\u2022")
+
+    def _switch_page(self, idx: int) -> None:
+        self._pages.setCurrentIndex(idx)
+        for i, item in enumerate(self._nav_items):
+            item.setChecked(i == idx)
+
+    def _build_footer(self) -> QWidget:
+        footer = QWidget()
+        footer.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_content']};")
+        layout = QHBoxLayout(footer)
+        layout.setContentsMargins(24, 16, 24, 16)
+
+        layout.addStretch(1)
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setFixedWidth(100)
+        cancel_btn.clicked.connect(self.reject)
+        layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save")
+        save_btn.setObjectName("accentButton")
+        save_btn.setFixedWidth(100)
+        save_btn.clicked.connect(self._save)
+        layout.addWidget(save_btn)
+
+        return footer
+
+    def _create_page(self, title: str, subtitle: str = "") -> tuple[QWidget, QVBoxLayout]:
+        """Create a scrollable page with header."""
+        page = QWidget()
+        page_layout = QVBoxLayout(page)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
+
+        # Header
+        header = QWidget()
+        header.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_content']};")
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(32, 28, 32, 20)
+        header_layout.setSpacing(4)
+
+        title_label = QLabel(title)
+        title_label.setStyleSheet(f"""
+            color: {_WIN11_COLORS["text_primary"]};
+            font-size: 28px;
+            font-weight: 600;
+        """)
+        header_layout.addWidget(title_label)
+
+        if subtitle:
+            sub_label = QLabel(subtitle)
+            sub_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 13px;")
+            header_layout.addWidget(sub_label)
+
+        page_layout.addWidget(header)
+
+        # Scrollable content
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        content = QWidget()
+        content.setStyleSheet(f"background-color: {_WIN11_COLORS['bg_content']};")
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(32, 0, 32, 32)
+        content_layout.setSpacing(12)
+
+        scroll.setWidget(content)
+        page_layout.addWidget(scroll, 1)
+
+        return page, content_layout
 
     # ============================================================= General
 
-    def _build_general_tab(self) -> QWidget:
-        w = QWidget()
-        form = QFormLayout(w)
-        _tighten_form(form)
+    def _build_general_page(self) -> QWidget:
+        page, layout = self._create_page("General", "Speech recognition and transcription settings")
+
+        # Dictation section
+        layout.addWidget(SectionHeader("Dictation"))
 
         self._mode_combo = QComboBox()
+        self._mode_combo.setFixedWidth(200)
         for m in DictationMode:
             self._mode_combo.addItem(m.value.capitalize(), m)
-        self._mode_combo.setCurrentIndex(
-            list(DictationMode).index(self._draft.dictation_mode)
-        )
-        form.addRow("Dictation mode", self._mode_combo)
+        self._mode_combo.setCurrentIndex(list(DictationMode).index(self._draft.dictation_mode))
+        layout.addWidget(SettingCard(
+            "Dictation mode",
+            "How text is processed after transcription",
+            self._mode_combo
+        ))
 
-        # Searchable multi-language picker. Single language = forced (fastest);
-        # multiple = Whisper auto-detects per utterance.
-        form.addRow(QLabel("Languages"))
+        # Language picker (full-width card)
+        lang_card = QFrame()
+        lang_card.setObjectName("settingCard")
+        lang_card.setStyleSheet(f"""
+            QFrame#settingCard {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border-radius: 6px;
+            }}
+        """)
+        lang_layout = QVBoxLayout(lang_card)
+        lang_layout.setContentsMargins(16, 12, 16, 12)
+        lang_layout.setSpacing(8)
+
+        lang_title = QLabel("Languages")
+        lang_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        lang_layout.addWidget(lang_title)
+
+        lang_desc = QLabel("Single language is forced (fastest). Multiple languages enable auto-detection.")
+        lang_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        lang_layout.addWidget(lang_desc)
+
         self._language_picker = LanguagePicker(self._draft.languages)
-        form.addRow(self._language_picker)
-        form.addRow(
-            self._caption(
-                "Single language is forced (fastest). "
-                "Multiple languages enable auto-detection per utterance."
-            )
-        )
+        lang_layout.addWidget(self._language_picker)
+
+        layout.addWidget(lang_card)
+
+        # Speech-to-text section
+        layout.addWidget(SectionHeader("Speech-to-Text Provider"))
 
         self._stt_combo = QComboBox()
+        self._stt_combo.setFixedWidth(280)
         _STT_LABELS = {
             STTProviderKind.whisper: "Local faster-whisper",
-            STTProviderKind.groq: "Groq whisper-large-v3-turbo (cloud, fastest)",
+            STTProviderKind.groq: "Groq whisper-large-v3-turbo (cloud)",
         }
         for s in STTProviderKind:
             self._stt_combo.addItem(_STT_LABELS.get(s, s.value), s)
-        self._stt_combo.setCurrentIndex(
-            list(STTProviderKind).index(self._draft.stt_provider)
-        )
-        form.addRow("Speech-to-text backend", self._stt_combo)
-        form.addRow(
-            "",
-            self._caption(
-                "Groq runs whisper-large-v3-turbo on dedicated GPUs and"
-                " finalizes a 5s clip in well under a second. Local"
-                " faster-whisper is offline but slower."
-            ),
-        )
+        self._stt_combo.setCurrentIndex(list(STTProviderKind).index(self._draft.stt_provider))
+        layout.addWidget(SettingCard(
+            "Backend",
+            "Groq is fastest but requires internet. Local is offline.",
+            self._stt_combo
+        ))
 
         self._groq_key_field = QLineEdit(self._secrets.get_groq_key())
         self._groq_key_field.setEchoMode(QLineEdit.EchoMode.Password)
         self._groq_key_field.setPlaceholderText("gsk_...")
-        form.addRow("Groq API Key", self._groq_key_field)
-        form.addRow(
-            "",
-            self._caption(
-                "Get a free key at console.groq.com. Stored in Windows"
-                " Credential Manager."
-            ),
-        )
+        self._groq_key_field.setFixedWidth(280)
+        layout.addWidget(SettingCard(
+            "Groq API Key",
+            "Get a free key at console.groq.com",
+            self._groq_key_field
+        ))
 
-        # ---- Groq free-tier usage bar
+        # Usage bar card
+        usage_card = QFrame()
+        usage_card.setObjectName("settingCard")
+        usage_card.setStyleSheet(f"""
+            QFrame#settingCard {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border-radius: 6px;
+            }}
+        """)
+        usage_layout = QVBoxLayout(usage_card)
+        usage_layout.setContentsMargins(16, 12, 16, 12)
+        usage_layout.setSpacing(8)
+
+        usage_title = QLabel("Groq Free Tier Usage (Today)")
+        usage_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        usage_layout.addWidget(usage_title)
+
         self._usage_bar = QProgressBar()
         self._usage_bar.setRange(0, 1000)
         self._usage_bar.setTextVisible(True)
-        self._usage_bar.setFixedHeight(18)
-        form.addRow("Groq free tier (today)", self._usage_bar)
-        self._usage_caption = self._caption("")
-        form.addRow("", self._usage_caption)
+        self._usage_bar.setFixedHeight(20)
+        usage_layout.addWidget(self._usage_bar)
+
+        self._usage_caption = QLabel("")
+        self._usage_caption.setStyleSheet(f"color: {_WIN11_COLORS['text_dim']}; font-size: 11px;")
+        self._usage_caption.setWordWrap(True)
+        usage_layout.addWidget(self._usage_caption)
+
+        layout.addWidget(usage_card)
         self._refresh_usage_bar()
-        # Keep the bar live while the dialog is open.
+
         self._usage_timer = QTimer(self)
         self._usage_timer.setInterval(2000)
         self._usage_timer.timeout.connect(self._refresh_usage_bar)
         self._usage_timer.start()
 
+        # Local Whisper settings
+        layout.addWidget(SectionHeader("Local Whisper Settings"))
+
         self._whisper_size = QComboBox()
+        self._whisper_size.setFixedWidth(160)
         for size in ["tiny.en", "base.en", "small.en", "medium.en"]:
             self._whisper_size.addItem(size)
         self._whisper_size.setCurrentText(self._draft.whisper_model_size)
-        form.addRow("Whisper model", self._whisper_size)
+        layout.addWidget(SettingCard(
+            "Model size",
+            "Larger models are more accurate but slower",
+            self._whisper_size
+        ))
 
         self._whisper_compute = QComboBox()
+        self._whisper_compute.setFixedWidth(160)
         for ct in ["int8", "int8_float16", "float16", "float32"]:
             self._whisper_compute.addItem(ct)
         self._whisper_compute.setCurrentText(self._draft.whisper_compute_type)
-        form.addRow("Whisper compute type", self._whisper_compute)
-        form.addRow(
-            "",
-            self._caption(
-                "int8 is fastest on CPU. Use float16 with CUDA for best speed + quality."
-            ),
-        )
+        layout.addWidget(SettingCard(
+            "Compute type",
+            "int8 is fastest on CPU, float16 for CUDA",
+            self._whisper_compute
+        ))
 
-        return w
+        layout.addStretch(1)
+        return page
 
     # ========================================================= Microphone
 
-    def _build_microphone_tab(self) -> QWidget:
-        w = QWidget()
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-        form = QFormLayout()
-        _tighten_form(form)
-        form.setContentsMargins(0, 0, 0, 0)
+    def _build_microphone_page(self) -> QWidget:
+        page, layout = self._create_page("Microphone", "Audio input device configuration")
+
+        layout.addWidget(SectionHeader("Input Device"))
 
         self._mic_combo = QComboBox()
+        self._mic_combo.setFixedWidth(300)
         self._populate_mic_devices()
-        form.addRow("Input device", self._mic_combo)
+        layout.addWidget(SettingCard(
+            "Input device",
+            "Select the microphone OpenWhisper should record from",
+            self._mic_combo
+        ))
 
         refresh_btn = QPushButton("Refresh device list")
         refresh_btn.clicked.connect(self._populate_mic_devices)
-        form.addRow("", refresh_btn)
+        layout.addWidget(SettingCard(
+            "Devices",
+            "Rescan for connected audio devices",
+            refresh_btn
+        ))
 
-        layout.addLayout(form)
-        layout.addWidget(
-            self._caption(
-                "Pick the microphone OpenWhisper should record from. 'System default'"
-                " follows whichever input Windows is currently using."
-            )
-        )
+        # Test section
+        layout.addWidget(SectionHeader("Test Recording"))
 
-        # ---- test recording row
-        self._mic_test_btn = QPushButton("Test mic (record 3s + play back)")
+        test_card = QFrame()
+        test_card.setObjectName("settingCard")
+        test_card.setStyleSheet(f"""
+            QFrame#settingCard {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border-radius: 6px;
+            }}
+        """)
+        test_layout = QVBoxLayout(test_card)
+        test_layout.setContentsMargins(16, 12, 16, 12)
+        test_layout.setSpacing(12)
+
+        test_title = QLabel("Microphone Test")
+        test_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        test_layout.addWidget(test_title)
+
+        test_desc = QLabel("Record 3 seconds of audio and play it back to verify your microphone is working.")
+        test_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        test_desc.setWordWrap(True)
+        test_layout.addWidget(test_desc)
+
+        self._mic_test_btn = QPushButton("Test microphone")
         self._mic_test_btn.clicked.connect(self._test_microphone)
-        layout.addWidget(self._mic_test_btn)
+        test_layout.addWidget(self._mic_test_btn)
 
         self._mic_test_status = QLabel("")
+        self._mic_test_status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
         self._mic_test_status.setWordWrap(True)
-        layout.addWidget(self._mic_test_status)
+        test_layout.addWidget(self._mic_test_status)
+
+        layout.addWidget(test_card)
 
         layout.addStretch(1)
-
-        # state for the running test
-        self._test_recording: np.ndarray | None = None
-        self._test_stream: sd.InputStream | None = None
-        self._test_chunks: list[np.ndarray] = []
-        return w
+        return page
 
     def _populate_mic_devices(self) -> None:
         self._mic_combo.blockSignals(True)
@@ -538,7 +940,6 @@ class SettingsWindow(QDialog):
             if dev.get("max_input_channels", 0) > 0:
                 name = dev.get("name", "?")
                 self._mic_combo.addItem(name, name)
-        # restore current selection
         current = self._draft.input_device
         if current:
             idx = self._mic_combo.findData(current)
@@ -548,7 +949,7 @@ class SettingsWindow(QDialog):
 
     def _test_microphone(self) -> None:
         if self._test_stream is not None:
-            return  # already running
+            return
         device_name = self._mic_combo.currentData()
         device_index = None
         if device_name:
@@ -564,7 +965,7 @@ class SettingsWindow(QDialog):
         sample_rate = 16_000
         self._test_chunks = []
 
-        def callback(indata, frames, time_info, status):  # noqa: ARG001
+        def callback(indata, frames, time_info, status):
             chunk = indata[:, 0].copy() if indata.ndim == 2 else indata.copy()
             self._test_chunks.append(chunk)
 
@@ -584,7 +985,7 @@ class SettingsWindow(QDialog):
             return
 
         self._mic_test_btn.setEnabled(False)
-        self._mic_test_status.setText("Recording 3 seconds — speak now…")
+        self._mic_test_status.setText("Recording 3 seconds - speak now...")
         QTimer.singleShot(3000, lambda: self._finish_mic_test(sample_rate))
 
     def _finish_mic_test(self, sample_rate: int) -> None:
@@ -608,8 +1009,8 @@ class SettingsWindow(QDialog):
         rms = float(np.sqrt(np.mean(samples ** 2))) if samples.size else 0.0
 
         self._mic_test_status.setText(
-            f"Captured {len(samples) / sample_rate:.1f}s — peak {peak:.3f}, "
-            f"RMS {rms:.4f}. Playing back…"
+            f"Captured {len(samples) / sample_rate:.1f}s - peak {peak:.3f}, "
+            f"RMS {rms:.4f}. Playing back..."
         )
 
         try:
@@ -619,78 +1020,99 @@ class SettingsWindow(QDialog):
             self._mic_test_btn.setEnabled(True)
             return
 
-        # Re-enable button after playback finishes (rough estimate).
         playback_ms = int((len(samples) / sample_rate) * 1000) + 250
         QTimer.singleShot(playback_ms, lambda: (
             self._mic_test_btn.setEnabled(True),
             self._mic_test_status.setText(
-                self._mic_test_status.text().replace("Playing back…", "Done.")
-                + ("  (silent — input level was 0)" if peak == 0 else "")
+                self._mic_test_status.text().replace("Playing back...", "Done.")
+                + ("  (silent - input level was 0)" if peak == 0 else "")
             ),
         ))
 
     # ============================================================= Hotkey
 
-    def _build_hotkey_tab(self) -> QWidget:
-        w = QWidget()
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(8)
+    def _build_hotkey_page(self) -> QWidget:
+        page, layout = self._create_page("Hotkey", "Configure keyboard shortcuts for dictation")
 
-        form = QFormLayout()
-        _tighten_form(form)
-        form.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(SectionHeader("Mode"))
 
         self._hotkey_mode = QComboBox()
+        self._hotkey_mode.setFixedWidth(200)
         for hm in HotkeyMode:
             self._hotkey_mode.addItem(hm.value.replace("_", " ").title(), hm)
-        self._hotkey_mode.setCurrentIndex(
-            list(HotkeyMode).index(self._draft.hotkey_mode)
-        )
-        form.addRow("Mode", self._hotkey_mode)
+        self._hotkey_mode.setCurrentIndex(list(HotkeyMode).index(self._draft.hotkey_mode))
+        layout.addWidget(SettingCard(
+            "Hotkey mode",
+            "Push-to-talk or toggle behavior",
+            self._hotkey_mode
+        ))
 
         self._command_mode = QComboBox()
+        self._command_mode.setFixedWidth(200)
         for cm in CommandModeSetting:
             self._command_mode.addItem(cm.value.replace("_", " ").title(), cm)
-        self._command_mode.setCurrentIndex(
-            list(CommandModeSetting).index(self._draft.command_mode)
-        )
-        form.addRow("Command mode", self._command_mode)
-        layout.addLayout(form)
+        self._command_mode.setCurrentIndex(list(CommandModeSetting).index(self._draft.command_mode))
+        layout.addWidget(SettingCard(
+            "Command mode",
+            "How voice commands are processed",
+            self._command_mode
+        ))
 
-        layout.addWidget(QLabel("Bindings"))
-        layout.addWidget(
-            self._caption(
-                "Any of these chords starts a dictation. Add as many as you"
-                " like — push-to-talk tracks all of them simultaneously."
-            )
-        )
+        # Bindings section
+        layout.addWidget(SectionHeader("Key Bindings"))
+
+        bindings_card = QFrame()
+        bindings_card.setObjectName("settingCard")
+        bindings_card.setStyleSheet(f"""
+            QFrame#settingCard {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border-radius: 6px;
+            }}
+        """)
+        bindings_layout = QVBoxLayout(bindings_card)
+        bindings_layout.setContentsMargins(16, 12, 16, 12)
+        bindings_layout.setSpacing(12)
+
+        bindings_title = QLabel("Active Bindings")
+        bindings_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        bindings_layout.addWidget(bindings_title)
+
+        bindings_desc = QLabel("Any of these chords starts a dictation. Add as many as you like.")
+        bindings_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        bindings_layout.addWidget(bindings_desc)
 
         self._bindings_list = QListWidget()
-        self._bindings_list.setSelectionMode(
-            QListWidget.SelectionMode.SingleSelection
-        )
+        self._bindings_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
+        self._bindings_list.setFixedHeight(120)
         for binding in self._draft.hotkeys:
             self._append_binding_item(binding)
-        layout.addWidget(self._bindings_list, 1)
+        bindings_layout.addWidget(self._bindings_list)
 
-        row = QHBoxLayout()
+        btn_row = QHBoxLayout()
         self._capture_btn = HotkeyCaptureButton()
         self._capture_btn.captured.connect(self._on_binding_captured)
-        row.addWidget(self._capture_btn, 1)
+        btn_row.addWidget(self._capture_btn, 1)
 
         remove_btn = QPushButton("Remove selected")
         remove_btn.clicked.connect(self._remove_selected_binding)
-        row.addWidget(remove_btn)
-        layout.addLayout(row)
+        btn_row.addWidget(remove_btn)
+        bindings_layout.addLayout(btn_row)
 
-        self._confirm_destructive = QCheckBox(
-            "Confirm destructive commands (send / delete / undo)"
-        )
+        layout.addWidget(bindings_card)
+
+        # Options
+        layout.addWidget(SectionHeader("Options"))
+
+        self._confirm_destructive = QCheckBox()
         self._confirm_destructive.setChecked(self._draft.confirm_destructive_commands)
-        layout.addWidget(self._confirm_destructive)
+        layout.addWidget(SettingCard(
+            "Confirm destructive commands",
+            "Ask for confirmation before send, delete, or undo",
+            self._confirm_destructive
+        ))
 
-        return w
+        layout.addStretch(1)
+        return page
 
     def _append_binding_item(self, binding: HotkeyBinding) -> None:
         item = QListWidgetItem(binding.display())
@@ -698,7 +1120,6 @@ class SettingsWindow(QDialog):
         self._bindings_list.addItem(item)
 
     def _on_binding_captured(self, binding: HotkeyBinding) -> None:
-        # Reject duplicates.
         payload = binding.model_dump()
         for i in range(self._bindings_list.count()):
             if self._bindings_list.item(i).data(Qt.ItemDataRole.UserRole) == payload:
@@ -710,159 +1131,55 @@ class SettingsWindow(QDialog):
         if row >= 0:
             self._bindings_list.takeItem(row)
 
-    # ========================================================= Dictionary
-
-    def _build_dictionary_tab(self) -> QWidget:
-        w = QWidget()
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-        layout.addWidget(QLabel("Personal dictionary"))
-        layout.addWidget(
-            self._caption(
-                "Names, jargon, product terms. Aliases are what whisper may output;"
-                " the term is how it should appear."
-            )
-        )
-
-        input_row = QHBoxLayout()
-        self._dict_term = QLineEdit()
-        self._dict_term.setPlaceholderText("Term")
-        self._dict_aliases = QLineEdit()
-        self._dict_aliases.setPlaceholderText("Aliases (comma separated)")
-        add_btn = QPushButton("Add")
-        add_btn.clicked.connect(self._add_dict_entry)
-        input_row.addWidget(self._dict_term, 1)
-        input_row.addWidget(self._dict_aliases, 2)
-        input_row.addWidget(add_btn)
-        layout.addLayout(input_row)
-
-        self._dict_list = QListWidget()
-        self._dict_list.itemDoubleClicked.connect(self._remove_selected_dict)
-        for entry in self._draft.dictionary:
-            self._append_dict_item(entry)
-        layout.addWidget(self._dict_list, 1)
-        layout.addWidget(self._caption("Double-click an entry to remove it."))
-        return w
-
-    def _append_dict_item(self, entry: DictionaryEntry) -> None:
-        label = entry.term
-        if entry.aliases:
-            label += f"  —  aliases: {', '.join(entry.aliases)}"
-        item = QListWidgetItem(label)
-        item.setData(Qt.ItemDataRole.UserRole, entry.id)
-        self._dict_list.addItem(item)
-
-    def _add_dict_entry(self) -> None:
-        term = self._dict_term.text().strip()
-        if not term:
-            return
-        aliases = [a.strip() for a in self._dict_aliases.text().split(",") if a.strip()]
-        entry = DictionaryEntry(term=term, aliases=aliases)
-        self._draft.dictionary.append(entry)
-        self._append_dict_item(entry)
-        self._dict_term.clear()
-        self._dict_aliases.clear()
-
-    def _remove_selected_dict(self, item: QListWidgetItem) -> None:
-        entry_id = item.data(Qt.ItemDataRole.UserRole)
-        self._draft.dictionary = [e for e in self._draft.dictionary if e.id != entry_id]
-        self._dict_list.takeItem(self._dict_list.row(item))
-
-    # =========================================================== Snippets
-
-    def _build_snippets_tab(self) -> QWidget:
-        w = QWidget()
-        layout = QVBoxLayout(w)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(6)
-        layout.addWidget(QLabel("Snippets"))
-        layout.addWidget(
-            self._caption(
-                "Triggers expand into longer text. Use /slash triggers or whole phrases."
-            )
-        )
-
-        input_row = QHBoxLayout()
-        self._snip_trigger = QLineEdit()
-        self._snip_trigger.setPlaceholderText("Trigger (e.g. /sig or signature block)")
-        self._snip_phrase = QCheckBox("Phrase")
-        input_row.addWidget(self._snip_trigger, 2)
-        input_row.addWidget(self._snip_phrase)
-        layout.addLayout(input_row)
-
-        self._snip_replacement = QTextEdit()
-        self._snip_replacement.setPlaceholderText("Replacement")
-        self._snip_replacement.setFixedHeight(44)
-        layout.addWidget(self._snip_replacement)
-
-        add_btn = QPushButton("Add snippet")
-        add_btn.clicked.connect(self._add_snippet)
-        layout.addWidget(add_btn)
-
-        self._snip_list = QListWidget()
-        self._snip_list.itemDoubleClicked.connect(self._remove_selected_snippet)
-        for snip in self._draft.snippets:
-            self._append_snippet_item(snip)
-        layout.addWidget(self._snip_list, 1)
-        layout.addWidget(self._caption("Double-click to remove."))
-        return w
-
-    def _append_snippet_item(self, snip: Snippet) -> None:
-        label = f"{snip.trigger}  →  {snip.replacement.splitlines()[0][:50] if snip.replacement else ''}"
-        item = QListWidgetItem(label)
-        item.setData(Qt.ItemDataRole.UserRole, snip.id)
-        self._snip_list.addItem(item)
-
-    def _add_snippet(self) -> None:
-        trigger = self._snip_trigger.text().strip()
-        replacement = self._snip_replacement.toPlainText()
-        if not trigger:
-            return
-        snip = Snippet(
-            trigger=trigger,
-            replacement=replacement,
-            trigger_is_phrase=self._snip_phrase.isChecked(),
-        )
-        self._draft.snippets.append(snip)
-        self._append_snippet_item(snip)
-        self._snip_trigger.clear()
-        self._snip_replacement.clear()
-        self._snip_phrase.setChecked(False)
-
-    def _remove_selected_snippet(self, item: QListWidgetItem) -> None:
-        snip_id = item.data(Qt.ItemDataRole.UserRole)
-        self._draft.snippets = [s for s in self._draft.snippets if s.id != snip_id]
-        self._snip_list.takeItem(self._snip_list.row(item))
-
     # =========================================================== Advanced
 
-    def _build_advanced_tab(self) -> QWidget:
-        w = QWidget()
-        form = QFormLayout(w)
-        _tighten_form(form)
+    def _build_advanced_page(self) -> QWidget:
+        page, layout = self._create_page("Advanced", "Text insertion and privacy settings")
+
+        layout.addWidget(SectionHeader("Text Insertion"))
 
         self._paste_behavior = QComboBox()
+        self._paste_behavior.setFixedWidth(200)
         for pb in PasteBehavior:
             self._paste_behavior.addItem(pb.value.replace("_", " ").title(), pb)
-        self._paste_behavior.setCurrentIndex(
-            list(PasteBehavior).index(self._draft.paste_behavior)
-        )
-        form.addRow("Insertion method", self._paste_behavior)
+        self._paste_behavior.setCurrentIndex(list(PasteBehavior).index(self._draft.paste_behavior))
+        layout.addWidget(SettingCard(
+            "Insertion method",
+            "How transcribed text is inserted into applications",
+            self._paste_behavior
+        ))
 
-        self._restore_clipboard = QCheckBox("Restore clipboard after paste")
+        self._restore_clipboard = QCheckBox()
         self._restore_clipboard.setChecked(self._draft.restore_clipboard)
-        form.addRow("", self._restore_clipboard)
+        layout.addWidget(SettingCard(
+            "Restore clipboard after paste",
+            "Preserve your clipboard contents after text insertion",
+            self._restore_clipboard
+        ))
 
-        self._save_audio_history = QCheckBox("Save audio history (off by default)")
+        # Privacy section
+        layout.addWidget(SectionHeader("Privacy"))
+
+        self._save_audio_history = QCheckBox()
         self._save_audio_history.setChecked(self._draft.save_audio_history)
-        form.addRow("Privacy", self._save_audio_history)
+        layout.addWidget(SettingCard(
+            "Save audio history",
+            "Store recorded audio clips locally (off by default)",
+            self._save_audio_history
+        ))
 
         self._history_size = QSpinBox()
         self._history_size.setRange(1, 200)
         self._history_size.setValue(self._draft.history_size)
-        form.addRow("Keep last N dictations", self._history_size)
-        return w
+        self._history_size.setFixedWidth(100)
+        layout.addWidget(SettingCard(
+            "History size",
+            "Number of recent dictations to keep",
+            self._history_size
+        ))
+
+        layout.addStretch(1)
+        return page
 
     # ============================================================== helpers
 
@@ -874,33 +1191,26 @@ class SettingsWindow(QDialog):
         limit_min = snap.day_limit / 60.0
         remaining_min = max(0.0, limit_min - used_min)
         self._usage_bar.setFormat(
-            f"{used_min:.1f} / {limit_min:.0f} min   ({frac * 100:.1f}%)"
+            f"{used_min:.1f} / {limit_min:.0f} min ({frac * 100:.1f}%)"
         )
-        # Color thresholds: green → amber → red.
         if frac >= 0.9:
-            color = "#d9534f"  # red
+            color = "#d9534f"
         elif frac >= 0.7:
-            color = "#f0ad4e"  # amber
+            color = "#f0ad4e"
         else:
-            color = "#5cb85c"  # green
+            color = _WIN11_COLORS["accent"]
         self._usage_bar.setStyleSheet(
-            "QProgressBar { border: 1px solid #555; border-radius: 4px;"
-            " background: #2a2a2a; text-align: center; color: #eee; }"
+            f"QProgressBar {{ border: 1px solid {_WIN11_COLORS['border']}; border-radius: 4px;"
+            f" background: {_WIN11_COLORS['input_bg']}; text-align: center; color: #eee; }}"
             f"QProgressBar::chunk {{ background-color: {color}; border-radius: 3px; }}"
         )
         hour_used_min = snap.hour_seconds / 60.0
         hour_limit_min = snap.hour_limit / 60.0
         self._usage_caption.setText(
-            f"{remaining_min:.1f} min left today"
-            f"  ·  this hour: {hour_used_min:.1f} / {hour_limit_min:.0f} min"
-            "  ·  resets on UTC day boundary. Tracked locally per machine."
+            f"{remaining_min:.1f} min left today  |  "
+            f"This hour: {hour_used_min:.1f} / {hour_limit_min:.0f} min  |  "
+            "Resets on UTC day boundary"
         )
-
-    def _caption(self, text: str) -> QLabel:
-        label = QLabel(text)
-        label.setStyleSheet("color: #888;")
-        label.setWordWrap(True)
-        return label
 
     # =================================================================== save
 
@@ -908,7 +1218,7 @@ class SettingsWindow(QDialog):
         try:
             self._draft.input_device = self._mic_combo.currentData()
             langs = self._language_picker.selected_languages()
-            if not langs:  # never leave it empty — fall back to English
+            if not langs:
                 langs = ["en"]
                 self._language_picker.set_selected(["en"])
             self._draft.languages = langs
