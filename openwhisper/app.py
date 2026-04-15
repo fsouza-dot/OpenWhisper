@@ -29,6 +29,7 @@ from .settings import AppSettings, SettingsStore, STTProviderKind
 from .stt.groq_provider import GroqWhisperProvider
 from .stt.whisper_provider import FasterWhisperProvider
 from .usage import UsageTracker
+from .ui.history_window import HistoryWindow
 from .ui.hud import HUDWindow
 from .ui.settings_window import SettingsWindow
 from .ui.tray import TrayIcon
@@ -82,10 +83,12 @@ class OpenWhisperApp(QObject):
         self.tray = TrayIcon(
             state=self.ui_state,
             on_open_settings=self.show_settings,
+            on_open_history=self.show_history,
             on_quit=self.quit,
         )
         self.tray.show()
         self._settings_window: Optional[SettingsWindow] = None
+        self._history_window: Optional[HistoryWindow] = None
 
         # ---- start
         self.coordinator.start()
@@ -157,6 +160,13 @@ class OpenWhisperApp(QObject):
             secrets=self.secrets,
             usage=self.usage,
             on_save=self._on_settings_saved,
+        )
+        dlg.exec()
+
+    def show_history(self) -> None:
+        dlg = HistoryWindow(
+            history=self.history,
+            settings_store=self.settings_store,
         )
         dlg.exec()
 

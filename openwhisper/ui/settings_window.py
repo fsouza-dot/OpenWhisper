@@ -26,6 +26,7 @@ from PySide6.QtWidgets import (
     QScrollArea,
     QSpinBox,
     QStackedWidget,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -63,7 +64,7 @@ _QT_KEY_NAMES: dict[int, str] = {
     int(Qt.Key.Key_Right): "right",
     int(Qt.Key.Key_Up): "up",
     int(Qt.Key.Key_Down): "down",
-    **{int(getattr(Qt.Key, f"Key_F{i}")): f"f{i}" for i in range(1, 13)},
+    **{int(getattr(Qt.Key, f"Key_F{i}")): f"f{i}" for i in range(1, 25)},
 }
 
 _MODIFIER_ONLY_KEYS = {
@@ -407,6 +408,100 @@ class HotkeyCaptureButton(QPushButton):
         super().focusOutEvent(event)
 
 
+class DictionaryEntryDialog(QDialog):
+    """Dialog for adding or editing a dictionary entry."""
+
+    def __init__(
+        self,
+        term: str = "",
+        aliases: list[str] | None = None,
+        parent: QWidget | None = None,
+    ):
+        super().__init__(parent)
+        self.setWindowTitle("Dictionary Entry")
+        self.setMinimumWidth(400)
+        self.setStyleSheet(f"""
+            QDialog {{
+                background-color: {_WIN11_COLORS["bg_content"]};
+            }}
+            QLabel {{
+                color: {_WIN11_COLORS["text_primary"]};
+            }}
+            QLineEdit, QTextEdit {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 4px;
+                padding: 8px;
+                color: {_WIN11_COLORS["text_primary"]};
+            }}
+            QPushButton {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+                border: none;
+                border-radius: 4px;
+                padding: 8px 16px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7dd8ff;
+            }}
+        """)
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(16)
+        layout.setContentsMargins(20, 20, 20, 20)
+
+        # Term field
+        term_label = QLabel("Correct Term")
+        term_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(term_label)
+
+        self._term_field = QLineEdit(term)
+        self._term_field.setPlaceholderText("e.g., Felipe")
+        layout.addWidget(self._term_field)
+
+        # Aliases field
+        aliases_label = QLabel("Aliases (one per line)")
+        aliases_label.setStyleSheet("font-weight: bold;")
+        layout.addWidget(aliases_label)
+
+        aliases_hint = QLabel("Words that should be corrected to the term above")
+        aliases_hint.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 11px;")
+        layout.addWidget(aliases_hint)
+
+        self._aliases_field = QTextEdit()
+        self._aliases_field.setPlaceholderText("e.g., Philippe\nPhilipe\nfee-lee-pay")
+        self._aliases_field.setMaximumHeight(100)
+        if aliases:
+            self._aliases_field.setPlainText("\n".join(aliases))
+        layout.addWidget(self._aliases_field)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+
+        cancel_btn = QPushButton("Cancel")
+        cancel_btn.setStyleSheet(f"""
+            background-color: {_WIN11_COLORS["bg_card"]};
+            color: {_WIN11_COLORS["text_primary"]};
+            border: 1px solid {_WIN11_COLORS["border"]};
+        """)
+        cancel_btn.clicked.connect(self.reject)
+        btn_layout.addWidget(cancel_btn)
+
+        save_btn = QPushButton("Save")
+        save_btn.clicked.connect(self.accept)
+        btn_layout.addWidget(save_btn)
+
+        layout.addLayout(btn_layout)
+
+    def get_values(self) -> tuple[str, list[str]]:
+        term = self._term_field.text().strip()
+        aliases_text = self._aliases_field.toPlainText()
+        aliases = [a.strip() for a in aliases_text.split("\n") if a.strip()]
+        return term, aliases
+
+
 class LanguagePicker(QWidget):
     """Dual-list language picker with flags and arrow buttons."""
 
@@ -720,6 +815,7 @@ class SettingsWindow(QDialog):
         self._pages = QStackedWidget()
         self._pages.addWidget(self._build_general_page())
         self._pages.addWidget(self._build_languages_page())
+        self._pages.addWidget(self._build_dictionary_page())
         self._pages.addWidget(self._build_microphone_page())
         self._pages.addWidget(self._build_hotkey_page())
         self._pages.addWidget(self._build_advanced_page())
@@ -784,9 +880,10 @@ class SettingsWindow(QDialog):
         nav_data = [
             ("General", 0),
             ("Languages", 1),
-            ("Microphone", 2),
-            ("Hotkey", 3),
-            ("Advanced", 4),
+            ("Dictionary", 2),
+            ("Microphone", 3),
+            ("Hotkey", 4),
+            ("Advanced", 5),
         ]
 
         for text, page_idx in nav_data:
@@ -807,6 +904,7 @@ class SettingsWindow(QDialog):
         icons = {
             "General": "\u2699",     # gear
             "Languages": "\U0001F310",  # globe
+            "Dictionary": "\U0001F4D6",  # book
             "Microphone": "\U0001F3A4",  # microphone
             "Hotkey": "\u2328",      # keyboard
             "Advanced": "\U0001F527",    # wrench
@@ -993,6 +1091,125 @@ class SettingsWindow(QDialog):
 
         layout.addStretch(1)
         return page
+
+    # ========================================================= Dictionary
+
+    def _build_dictionary_page(self) -> QWidget:
+        page, layout = self._create_page(
+            "Dictionary",
+            "Custom words and corrections for better transcription accuracy"
+        )
+
+        layout.addWidget(SectionHeader("Word Corrections"))
+
+        # Description
+        desc = QLabel(
+            "Add words that are often mis-transcribed due to accent, jargon, or names.\n"
+            "The 'Term' is the correct spelling. 'Aliases' are how it might be heard."
+        )
+        desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; padding: 0 0 12px 0;")
+        desc.setWordWrap(True)
+        layout.addWidget(desc)
+
+        # Dictionary list
+        self._dict_list = QListWidget()
+        self._dict_list.setMinimumHeight(200)
+        self._dict_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 6px;
+                padding: 4px;
+            }}
+            QListWidget::item {{
+                padding: 8px;
+                border-radius: 4px;
+                color: {_WIN11_COLORS["text_primary"]};
+            }}
+            QListWidget::item:selected {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+            }}
+            QListWidget::item:hover {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
+        self._dict_list.itemDoubleClicked.connect(self._on_dict_edit)
+        self._refresh_dict_list()
+        layout.addWidget(self._dict_list)
+
+        # Buttons
+        btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        add_btn = QPushButton("Add Entry")
+        add_btn.clicked.connect(self._on_dict_add)
+        btn_layout.addWidget(add_btn)
+
+        edit_btn = QPushButton("Edit")
+        edit_btn.clicked.connect(self._on_dict_edit)
+        btn_layout.addWidget(edit_btn)
+
+        remove_btn = QPushButton("Remove")
+        remove_btn.clicked.connect(self._on_dict_remove)
+        btn_layout.addWidget(remove_btn)
+
+        btn_layout.addStretch()
+        layout.addLayout(btn_layout)
+
+        layout.addStretch(1)
+        return page
+
+    def _refresh_dict_list(self) -> None:
+        self._dict_list.clear()
+        for entry in self._draft.dictionary:
+            aliases_str = ", ".join(entry.aliases) if entry.aliases else "(no aliases)"
+            item = QListWidgetItem(f"{entry.term}  \u2190  {aliases_str}")
+            item.setData(Qt.ItemDataRole.UserRole, entry.id)
+            self._dict_list.addItem(item)
+
+    def _on_dict_add(self) -> None:
+        dlg = DictionaryEntryDialog(parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            term, aliases = dlg.get_values()
+            if term:
+                new_entry = DictionaryEntry(term=term, aliases=aliases)
+                self._draft.dictionary = list(self._draft.dictionary) + [new_entry]
+                self._refresh_dict_list()
+                self._auto_save()
+
+    def _on_dict_edit(self) -> None:
+        item = self._dict_list.currentItem()
+        if not item:
+            return
+        entry_id = item.data(Qt.ItemDataRole.UserRole)
+        entry = next((e for e in self._draft.dictionary if e.id == entry_id), None)
+        if not entry:
+            return
+
+        dlg = DictionaryEntryDialog(entry.term, entry.aliases, parent=self)
+        if dlg.exec() == QDialog.DialogCode.Accepted:
+            term, aliases = dlg.get_values()
+            if term:
+                # Update the entry
+                new_dict = []
+                for e in self._draft.dictionary:
+                    if e.id == entry_id:
+                        new_dict.append(DictionaryEntry(id=e.id, term=term, aliases=aliases))
+                    else:
+                        new_dict.append(e)
+                self._draft.dictionary = new_dict
+                self._refresh_dict_list()
+                self._auto_save()
+
+    def _on_dict_remove(self) -> None:
+        item = self._dict_list.currentItem()
+        if not item:
+            return
+        entry_id = item.data(Qt.ItemDataRole.UserRole)
+        self._draft.dictionary = [e for e in self._draft.dictionary if e.id != entry_id]
+        self._refresh_dict_list()
+        self._auto_save()
 
     # ========================================================= Microphone
 

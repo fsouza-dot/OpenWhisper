@@ -41,6 +41,7 @@ class TrayIcon(QSystemTrayIcon):
         self,
         state: UIState,
         on_open_settings: Callable[[], None],
+        on_open_history: Callable[[], None],
         on_quit: Callable[[], None],
     ):
         super().__init__(_make_dot_icon(_PHASE_COLORS[Phase.idle]))
@@ -52,6 +53,10 @@ class TrayIcon(QSystemTrayIcon):
         title.setEnabled(False)
         menu.addAction(title)
         menu.addSeparator()
+
+        history_action = QAction("History...", menu)
+        history_action.triggered.connect(on_open_history)
+        menu.addAction(history_action)
 
         settings_action = QAction("Settings...", menu)
         settings_action.triggered.connect(on_open_settings)
