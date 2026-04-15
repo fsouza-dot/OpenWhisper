@@ -8,17 +8,15 @@ on:
     branches: [main]
   workflow_dispatch:  # Allow manual trigger
 
+env:
+  # Use Node.js 24 to avoid deprecation warnings
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
-    strategy:
-      matrix:
-        include:
-          - runner: macos-14    # Apple Silicon (ARM64)
-            arch: arm64
-          - runner: macos-13    # Intel (x86_64)
-            arch: x86_64
-
-    runs-on: ${{ matrix.runner }}
+    # Use macos-latest (Apple Silicon ARM64)
+    # Intel builds can be added later if needed
+    runs-on: macos-latest
 
     steps:
       - name: Checkout code
@@ -82,7 +80,7 @@ jobs:
           hdiutil create -volname "OpenWhisper" \
             -srcfolder dmg_staging \
             -ov -format UDZO \
-            "OpenWhisper-${{ matrix.arch }}.dmg"
+            "OpenWhisper-macOS.dmg"
 
           # Cleanup
           rm -rf dmg_staging
@@ -90,13 +88,13 @@ jobs:
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: OpenWhisper-macOS-${{ matrix.arch }}
-          path: OpenWhisper-${{ matrix.arch }}.dmg
+          name: OpenWhisper-macOS
+          path: OpenWhisper-macOS.dmg
 
       - name: Upload to Release (if tagged)
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
         with:
-          files: OpenWhisper-${{ matrix.arch }}.dmg
+          files: OpenWhisper-macOS.dmg
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
