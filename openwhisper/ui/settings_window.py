@@ -3,12 +3,13 @@ Works on a draft copy of `AppSettings` so the user can cancel.
 """
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Callable
 
 import numpy as np
 import sounddevice as sd
-from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtGui import QFont
+from PySide6.QtCore import Qt, QSize, QTimer, Signal
+from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -85,84 +86,97 @@ def _qt_key_to_name(key: int) -> str | None:
     return None
 
 
-# ==================== Language Flags ====================
+# ==================== Language to Country Code Mapping ====================
 
-# Map language codes to flag emojis
-# Portuguese uses Brazilian flag as requested
-LANGUAGE_FLAGS: dict[str, str] = {
-    "en": "\U0001F1FA\U0001F1F8",  # US
-    "es": "\U0001F1EA\U0001F1F8",  # Spain
-    "fr": "\U0001F1EB\U0001F1F7",  # France
-    "de": "\U0001F1E9\U0001F1EA",  # Germany
-    "it": "\U0001F1EE\U0001F1F9",  # Italy
-    "pt": "\U0001F1E7\U0001F1F7",  # Brazil (as requested)
-    "nl": "\U0001F1F3\U0001F1F1",  # Netherlands
-    "pl": "\U0001F1F5\U0001F1F1",  # Poland
-    "ru": "\U0001F1F7\U0001F1FA",  # Russia
-    "uk": "\U0001F1FA\U0001F1E6",  # Ukraine
-    "ja": "\U0001F1EF\U0001F1F5",  # Japan
-    "ko": "\U0001F1F0\U0001F1F7",  # South Korea
-    "zh": "\U0001F1E8\U0001F1F3",  # China
-    "ar": "\U0001F1F8\U0001F1E6",  # Saudi Arabia
-    "cs": "\U0001F1E8\U0001F1FF",  # Czechia
-    "da": "\U0001F1E9\U0001F1F0",  # Denmark
-    "el": "\U0001F1EC\U0001F1F7",  # Greece
-    "fi": "\U0001F1EB\U0001F1EE",  # Finland
-    "he": "\U0001F1EE\U0001F1F1",  # Israel
-    "hi": "\U0001F1EE\U0001F1F3",  # India
-    "hu": "\U0001F1ED\U0001F1FA",  # Hungary
-    "id": "\U0001F1EE\U0001F1E9",  # Indonesia
-    "ms": "\U0001F1F2\U0001F1FE",  # Malaysia
-    "no": "\U0001F1F3\U0001F1F4",  # Norway
-    "ro": "\U0001F1F7\U0001F1F4",  # Romania
-    "sk": "\U0001F1F8\U0001F1F0",  # Slovakia
-    "sv": "\U0001F1F8\U0001F1EA",  # Sweden
-    "th": "\U0001F1F9\U0001F1ED",  # Thailand
-    "tr": "\U0001F1F9\U0001F1F7",  # Turkey
-    "vi": "\U0001F1FB\U0001F1F3",  # Vietnam
-    "af": "\U0001F1FF\U0001F1E6",  # South Africa
-    "az": "\U0001F1E6\U0001F1FF",  # Azerbaijan
-    "be": "\U0001F1E7\U0001F1FE",  # Belarus
-    "bg": "\U0001F1E7\U0001F1EC",  # Bulgaria
-    "bn": "\U0001F1E7\U0001F1E9",  # Bangladesh
-    "bs": "\U0001F1E7\U0001F1E6",  # Bosnia
-    "ca": "\U0001F1EA\U0001F1F8",  # Spain (Catalan)
-    "cy": "\U0001F3F4\U000E0067\U000E0062\U000E0077\U000E006C\U000E0073\U000E007F",  # Wales
-    "et": "\U0001F1EA\U0001F1EA",  # Estonia
-    "eu": "\U0001F1EA\U0001F1F8",  # Spain (Basque)
-    "fa": "\U0001F1EE\U0001F1F7",  # Iran
-    "gl": "\U0001F1EA\U0001F1F8",  # Spain (Galician)
-    "gu": "\U0001F1EE\U0001F1F3",  # India
-    "hr": "\U0001F1ED\U0001F1F7",  # Croatia
-    "hy": "\U0001F1E6\U0001F1F2",  # Armenia
-    "is": "\U0001F1EE\U0001F1F8",  # Iceland
-    "ka": "\U0001F1EC\U0001F1EA",  # Georgia
-    "kk": "\U0001F1F0\U0001F1FF",  # Kazakhstan
-    "kn": "\U0001F1EE\U0001F1F3",  # India
-    "lt": "\U0001F1F1\U0001F1F9",  # Lithuania
-    "lv": "\U0001F1F1\U0001F1FB",  # Latvia
-    "mk": "\U0001F1F2\U0001F1F0",  # North Macedonia
-    "ml": "\U0001F1EE\U0001F1F3",  # India
-    "mn": "\U0001F1F2\U0001F1F3",  # Mongolia
-    "mr": "\U0001F1EE\U0001F1F3",  # India
-    "mt": "\U0001F1F2\U0001F1F9",  # Malta
-    "ne": "\U0001F1F3\U0001F1F5",  # Nepal
-    "pa": "\U0001F1EE\U0001F1F3",  # India
-    "si": "\U0001F1F1\U0001F1F0",  # Sri Lanka
-    "sl": "\U0001F1F8\U0001F1EE",  # Slovenia
-    "sq": "\U0001F1E6\U0001F1F1",  # Albania
-    "sr": "\U0001F1F7\U0001F1F8",  # Serbia
-    "sw": "\U0001F1F0\U0001F1EA",  # Kenya
-    "ta": "\U0001F1EE\U0001F1F3",  # India
-    "te": "\U0001F1EE\U0001F1F3",  # India
-    "tl": "\U0001F1F5\U0001F1ED",  # Philippines
-    "ur": "\U0001F1F5\U0001F1F0",  # Pakistan
+# Map language codes to country codes for flag images
+# Portuguese uses BR (Brazil) as requested
+LANGUAGE_COUNTRY: dict[str, str] = {
+    "en": "us",
+    "es": "es",
+    "fr": "fr",
+    "de": "de",
+    "it": "it",
+    "pt": "br",  # Brazil as requested
+    "nl": "nl",
+    "pl": "pl",
+    "ru": "ru",
+    "uk": "ua",
+    "ja": "jp",
+    "ko": "kr",
+    "zh": "cn",
+    "ar": "sa",
+    "cs": "cz",
+    "da": "dk",
+    "el": "gr",
+    "fi": "fi",
+    "he": "il",
+    "hi": "in",
+    "hu": "hu",
+    "id": "id",
+    "ms": "my",
+    "no": "no",
+    "ro": "ro",
+    "sk": "sk",
+    "sv": "se",
+    "th": "th",
+    "tr": "tr",
+    "vi": "vn",
+    "af": "za",
+    "az": "az",
+    "be": "by",
+    "bg": "bg",
+    "bn": "bd",
+    "bs": "ba",
+    "ca": "es",
+    "cy": "gb",
+    "et": "ee",
+    "eu": "es",
+    "fa": "ir",
+    "gl": "es",
+    "gu": "in",
+    "hr": "hr",
+    "hy": "am",
+    "is": "is",
+    "ka": "ge",
+    "kk": "kz",
+    "kn": "in",
+    "lt": "lt",
+    "lv": "lv",
+    "mk": "mk",
+    "ml": "in",
+    "mn": "mn",
+    "mr": "in",
+    "mt": "mt",
+    "ne": "np",
+    "pa": "in",
+    "si": "lk",
+    "sl": "si",
+    "sq": "al",
+    "sr": "rs",
+    "sw": "ke",
+    "ta": "in",
+    "te": "in",
+    "tl": "ph",
+    "ur": "pk",
 }
 
 
-def get_flag(code: str) -> str:
-    """Get flag emoji for a language code, or globe if not found."""
-    return LANGUAGE_FLAGS.get(code, "\U0001F310")  # Globe as fallback
+def get_country_code(lang_code: str) -> str:
+    """Get country code for a language code."""
+    return LANGUAGE_COUNTRY.get(lang_code, lang_code)
+
+
+# Path to bundled flag images
+FLAGS_DIR = Path(__file__).parent.parent / "resources" / "flags"
+
+
+def get_flag_icon(lang_code: str) -> QIcon:
+    """Get flag icon for a language code."""
+    country = get_country_code(lang_code)
+    flag_path = FLAGS_DIR / f"{country}.png"
+    if flag_path.exists():
+        return QIcon(str(flag_path))
+    return QIcon()
 
 
 # ==================== Windows 11 Style Constants ====================
@@ -184,13 +198,17 @@ _WIN11_COLORS = {
 }
 
 _WIN11_QSS = f"""
+* {{
+    font-family: "Segoe UI", "Segoe UI Emoji", sans-serif;
+}}
 QDialog {{
     background-color: {_WIN11_COLORS["bg_window"]};
     color: {_WIN11_COLORS["text_primary"]};
 }}
 QLabel {{
     color: {_WIN11_COLORS["text_primary"]};
-    background: transparent;
+    background: none;
+    border: none;
 }}
 QLineEdit, QComboBox, QSpinBox {{
     background-color: {_WIN11_COLORS["input_bg"]};
@@ -402,109 +420,42 @@ class LanguagePicker(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(16)
+        layout.setSpacing(12)
 
-        # Search bar at top
-        search_row = QHBoxLayout()
-        search_icon = QLabel("\U0001F50D")
-        search_icon.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 14px;")
-        search_row.addWidget(search_icon)
+        # Search bar
         self._search = QLineEdit()
         self._search.setPlaceholderText("Search languages...")
         self._search.textChanged.connect(self._filter_available)
         self._search.setClearButtonEnabled(True)
-        self._search.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: {_WIN11_COLORS["input_bg"]};
-                border: 1px solid {_WIN11_COLORS["border"]};
-                border-radius: 6px;
-                padding: 10px 14px;
-                font-size: 14px;
-            }}
-            QLineEdit:focus {{
-                border: 1px solid {_WIN11_COLORS["accent"]};
-            }}
-        """)
-        search_row.addWidget(self._search)
-        layout.addLayout(search_row)
+        layout.addWidget(self._search)
 
         lists_row = QHBoxLayout()
-        lists_row.setSpacing(16)
+        lists_row.setSpacing(12)
 
         # Left column - Available
         left_col = QVBoxLayout()
-        left_col.setSpacing(8)
+        left_col.setSpacing(6)
         lbl = QLabel("Available")
-        lbl.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px; font-weight: 600;")
         left_col.addWidget(lbl)
         self._available_list = QListWidget()
         self._available_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._available_list.setMinimumHeight(280)
+        self._available_list.setMinimumHeight(260)
+        self._available_list.setIconSize(QSize(24, 18))  # 4:3 flag aspect ratio
         self._available_list.itemDoubleClicked.connect(self._add_selected_item)
-        self._available_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {_WIN11_COLORS["input_bg"]};
-                border: 1px solid {_WIN11_COLORS["border"]};
-                border-radius: 8px;
-                padding: 4px;
-                font-size: 14px;
-            }}
-            QListWidget::item {{
-                padding: 10px 12px;
-                border-radius: 6px;
-                margin: 2px 4px;
-            }}
-            QListWidget::item:selected {{
-                background-color: {_WIN11_COLORS["accent"]};
-                color: #000000;
-            }}
-            QListWidget::item:hover:!selected {{
-                background-color: {_WIN11_COLORS["bg_card_hover"]};
-            }}
-        """)
         left_col.addWidget(self._available_list)
         lists_row.addLayout(left_col, 1)
 
         # Middle buttons
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(12)
+        btn_col.setSpacing(8)
         btn_col.addStretch(1)
-        self._add_btn = QPushButton("\u2192")  # Right arrow
-        self._add_btn.setFixedSize(44, 44)
-        self._add_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {_WIN11_COLORS["accent"]};
-                color: #000000;
-                border: none;
-                border-radius: 22px;
-                font-size: 18px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #7ed6ff;
-            }}
-            QPushButton:disabled {{
-                background-color: {_WIN11_COLORS["bg_card"]};
-                color: {_WIN11_COLORS["text_dim"]};
-            }}
-        """)
+        self._add_btn = QPushButton(">")
+        self._add_btn.setFixedSize(40, 32)
+        self._add_btn.setObjectName("accentButton")
         self._add_btn.clicked.connect(self._add_selected)
         btn_col.addWidget(self._add_btn)
-        self._remove_btn = QPushButton("\u2190")  # Left arrow
-        self._remove_btn.setFixedSize(44, 44)
-        self._remove_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {_WIN11_COLORS["bg_card"]};
-                color: {_WIN11_COLORS["text_primary"]};
-                border: 1px solid {_WIN11_COLORS["border"]};
-                border-radius: 22px;
-                font-size: 18px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: {_WIN11_COLORS["bg_card_hover"]};
-            }}
-        """)
+        self._remove_btn = QPushButton("<")
+        self._remove_btn.setFixedSize(40, 32)
         self._remove_btn.clicked.connect(self._remove_selected)
         btn_col.addWidget(self._remove_btn)
         btn_col.addStretch(1)
@@ -512,70 +463,37 @@ class LanguagePicker(QWidget):
 
         # Right column - Selected
         right_col = QVBoxLayout()
-        right_col.setSpacing(8)
+        right_col.setSpacing(6)
         lbl2 = QLabel("Selected (max 3)")
-        lbl2.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px; font-weight: 600;")
         right_col.addWidget(lbl2)
         self._selected_list = QListWidget()
         self._selected_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._selected_list.setMinimumHeight(280)
+        self._selected_list.setMinimumHeight(260)
+        self._selected_list.setIconSize(QSize(24, 18))  # 4:3 flag aspect ratio
         self._selected_list.itemDoubleClicked.connect(self._remove_selected_item)
-        self._selected_list.setStyleSheet(f"""
-            QListWidget {{
-                background-color: {_WIN11_COLORS["input_bg"]};
-                border: 1px solid {_WIN11_COLORS["border"]};
-                border-radius: 8px;
-                padding: 4px;
-                font-size: 14px;
-            }}
-            QListWidget::item {{
-                padding: 10px 12px;
-                border-radius: 6px;
-                margin: 2px 4px;
-            }}
-            QListWidget::item:selected {{
-                background-color: {_WIN11_COLORS["accent"]};
-                color: #000000;
-            }}
-            QListWidget::item:hover:!selected {{
-                background-color: {_WIN11_COLORS["bg_card_hover"]};
-            }}
-        """)
         right_col.addWidget(self._selected_list)
         lists_row.addLayout(right_col, 1)
 
         layout.addLayout(lists_row)
 
-        # Status with icon
-        status_row = QHBoxLayout()
-        self._status_icon = QLabel("\u2139")  # Info icon
-        self._status_icon.setStyleSheet(f"color: {_WIN11_COLORS['accent']}; font-size: 14px;")
-        status_row.addWidget(self._status_icon)
+        # Status
         self._status = QLabel()
-        self._status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
-        status_row.addWidget(self._status)
-        status_row.addStretch(1)
-        layout.addLayout(status_row)
+        self._status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; background: transparent;")
+        layout.addWidget(self._status)
 
         self._populate_lists()
         self._update_status()
-
-    def _get_display_with_flag(self, code: str) -> str:
-        """Get language display string with flag emoji."""
-        flag = get_flag(code)
-        display = get_language_display(code)
-        return f"{flag}  {display}"
 
     def _populate_lists(self) -> None:
         self._available_list.clear()
         self._selected_list.clear()
         for code, english, native in WHISPER_LANGUAGES:
             if code not in self._selected:
-                item = QListWidgetItem(self._get_display_with_flag(code))
+                item = QListWidgetItem(get_flag_icon(code), get_language_display(code))
                 item.setData(Qt.ItemDataRole.UserRole, code)
                 self._available_list.addItem(item)
         for code in self._selected:
-            item = QListWidgetItem(self._get_display_with_flag(code))
+            item = QListWidgetItem(get_flag_icon(code), get_language_display(code))
             item.setData(Qt.ItemDataRole.UserRole, code)
             self._selected_list.addItem(item)
 
@@ -651,29 +569,32 @@ class SettingCard(QFrame):
             QFrame#settingCard {{
                 background-color: {_WIN11_COLORS["bg_card"]};
                 border-radius: 6px;
-                padding: 4px;
             }}
             QFrame#settingCard:hover {{
                 background-color: {_WIN11_COLORS["bg_card_hover"]};
             }}
+            QFrame#settingCard QLabel {{
+                background-color: transparent;
+                border: none;
+            }}
         """)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
+        layout.setContentsMargins(16, 14, 16, 14)
         layout.setSpacing(12)
 
         # Text section
         text_layout = QVBoxLayout()
-        text_layout.setSpacing(2)
+        text_layout.setSpacing(4)
         text_layout.setContentsMargins(0, 0, 0, 0)
 
         title_label = QLabel(title)
-        title_label.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        title_label.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px; background: transparent;")
         text_layout.addWidget(title_label)
 
         if description:
             desc_label = QLabel(description)
-            desc_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+            desc_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; background: transparent;")
             desc_label.setWordWrap(True)
             text_layout.addWidget(desc_label)
 
@@ -690,9 +611,11 @@ class SectionHeader(QLabel):
         super().__init__(text, parent)
         self.setStyleSheet(f"""
             color: {_WIN11_COLORS["text_primary"]};
+            background: transparent;
             font-size: 14px;
             font-weight: 600;
             padding: 8px 0 4px 0;
+            border: none;
         """)
 
 
@@ -885,6 +808,7 @@ class SettingsWindow(QDialog):
         title_label = QLabel(title)
         title_label.setStyleSheet(f"""
             color: {_WIN11_COLORS["text_primary"]};
+            background: transparent;
             font-size: 28px;
             font-weight: 600;
         """)
@@ -892,7 +816,7 @@ class SettingsWindow(QDialog):
 
         if subtitle:
             sub_label = QLabel(subtitle)
-            sub_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 13px;")
+            sub_label.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; background: transparent; font-size: 13px;")
             header_layout.addWidget(sub_label)
 
         page_layout.addWidget(header)
@@ -962,19 +886,23 @@ class SettingsWindow(QDialog):
 
         # Usage bar card
         usage_card = QFrame()
-        usage_card.setObjectName("settingCard")
+        usage_card.setObjectName("usageCard")
         usage_card.setStyleSheet(f"""
-            QFrame#settingCard {{
+            QFrame#usageCard {{
                 background-color: {_WIN11_COLORS["bg_card"]};
                 border-radius: 6px;
             }}
+            QFrame#usageCard QLabel {{
+                background: transparent;
+                border: none;
+            }}
         """)
         usage_layout = QVBoxLayout(usage_card)
-        usage_layout.setContentsMargins(16, 12, 16, 12)
+        usage_layout.setContentsMargins(16, 14, 16, 14)
         usage_layout.setSpacing(8)
 
         usage_title = QLabel("Groq Free Tier Usage (Today)")
-        usage_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        usage_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px; background: transparent;")
         usage_layout.addWidget(usage_title)
 
         self._usage_bar = QProgressBar()
@@ -984,7 +912,7 @@ class SettingsWindow(QDialog):
         usage_layout.addWidget(self._usage_bar)
 
         self._usage_caption = QLabel("")
-        self._usage_caption.setStyleSheet(f"color: {_WIN11_COLORS['text_dim']}; font-size: 11px;")
+        self._usage_caption.setStyleSheet(f"color: {_WIN11_COLORS['text_dim']}; font-size: 11px; background: transparent;")
         self._usage_caption.setWordWrap(True)
         usage_layout.addWidget(self._usage_caption)
 
@@ -1027,37 +955,10 @@ class SettingsWindow(QDialog):
     # ========================================================= Languages
 
     def _build_languages_page(self) -> QWidget:
-        page, layout = self._create_page("Languages", "Choose which languages to recognize")
-
-        # Info card at top
-        info_card = QFrame()
-        info_card.setObjectName("infoCard")
-        info_card.setStyleSheet(f"""
-            QFrame#infoCard {{
-                background-color: rgba(96, 205, 255, 0.1);
-                border: 1px solid {_WIN11_COLORS["accent"]};
-                border-radius: 8px;
-            }}
-        """)
-        info_layout = QHBoxLayout(info_card)
-        info_layout.setContentsMargins(16, 14, 16, 14)
-        info_layout.setSpacing(12)
-
-        info_icon = QLabel("\U0001F4A1")  # Light bulb
-        info_icon.setStyleSheet("font-size: 20px;")
-        info_layout.addWidget(info_icon)
-
-        info_text = QLabel(
-            "<b>Performance tip:</b> Selecting a single language forces that language "
-            "and provides the fastest transcription. Multiple languages enable "
-            "auto-detection per utterance but may be slightly slower."
+        page, layout = self._create_page(
+            "Languages",
+            "Single language = fastest. Multiple = auto-detect per utterance."
         )
-        info_text.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px;")
-        info_text.setWordWrap(True)
-        info_layout.addWidget(info_text, 1)
-
-        layout.addWidget(info_card)
-        layout.addSpacing(8)
 
         # Language picker
         self._language_picker = LanguagePicker(self._draft.languages)
@@ -1094,23 +995,27 @@ class SettingsWindow(QDialog):
         layout.addWidget(SectionHeader("Test Recording"))
 
         test_card = QFrame()
-        test_card.setObjectName("settingCard")
+        test_card.setObjectName("testCard")
         test_card.setStyleSheet(f"""
-            QFrame#settingCard {{
+            QFrame#testCard {{
                 background-color: {_WIN11_COLORS["bg_card"]};
                 border-radius: 6px;
             }}
+            QFrame#testCard QLabel {{
+                background: transparent;
+                border: none;
+            }}
         """)
         test_layout = QVBoxLayout(test_card)
-        test_layout.setContentsMargins(16, 12, 16, 12)
+        test_layout.setContentsMargins(16, 14, 16, 14)
         test_layout.setSpacing(12)
 
         test_title = QLabel("Microphone Test")
-        test_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        test_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px; background: transparent;")
         test_layout.addWidget(test_title)
 
         test_desc = QLabel("Record 3 seconds of audio and play it back to verify your microphone is working.")
-        test_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        test_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; background: transparent;")
         test_desc.setWordWrap(True)
         test_layout.addWidget(test_desc)
 
@@ -1119,7 +1024,7 @@ class SettingsWindow(QDialog):
         test_layout.addWidget(self._mic_test_btn)
 
         self._mic_test_status = QLabel("")
-        self._mic_test_status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        self._mic_test_status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; background: transparent;")
         self._mic_test_status.setWordWrap(True)
         test_layout.addWidget(self._mic_test_status)
 
@@ -1264,23 +1169,27 @@ class SettingsWindow(QDialog):
         layout.addWidget(SectionHeader("Key Bindings"))
 
         bindings_card = QFrame()
-        bindings_card.setObjectName("settingCard")
+        bindings_card.setObjectName("bindingsCard")
         bindings_card.setStyleSheet(f"""
-            QFrame#settingCard {{
+            QFrame#bindingsCard {{
                 background-color: {_WIN11_COLORS["bg_card"]};
                 border-radius: 6px;
             }}
+            QFrame#bindingsCard QLabel {{
+                background: transparent;
+                border: none;
+            }}
         """)
         bindings_layout = QVBoxLayout(bindings_card)
-        bindings_layout.setContentsMargins(16, 12, 16, 12)
+        bindings_layout.setContentsMargins(16, 14, 16, 14)
         bindings_layout.setSpacing(12)
 
         bindings_title = QLabel("Active Bindings")
-        bindings_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
+        bindings_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px; background: transparent;")
         bindings_layout.addWidget(bindings_title)
 
         bindings_desc = QLabel("Any of these chords starts a dictation. Add as many as you like.")
-        bindings_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        bindings_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; background: transparent;")
         bindings_layout.addWidget(bindings_desc)
 
         self._bindings_list = QListWidget()
