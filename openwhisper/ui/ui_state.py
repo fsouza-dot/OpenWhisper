@@ -5,6 +5,7 @@ without polling.
 from __future__ import annotations
 
 from enum import Enum
+from typing import List
 
 from PySide6.QtCore import QObject, Signal
 
@@ -22,6 +23,7 @@ class UIState(QObject):
     phaseChanged = Signal(Phase, str)  # phase, message
     livePreviewChanged = Signal(str)
     lastInsertedChanged = Signal(str)
+    audioLevelsChanged = Signal(list)  # list of 5 floats (0.0-1.0)
 
     def __init__(self) -> None:
         super().__init__()
@@ -29,6 +31,7 @@ class UIState(QObject):
         self._message = ""
         self._live_preview = ""
         self._last_inserted = ""
+        self._audio_levels: List[float] = [0.0] * 5
 
     @property
     def phase(self) -> Phase:
@@ -50,6 +53,15 @@ class UIState(QObject):
     def set_last_inserted(self, text: str) -> None:
         self._last_inserted = text
         self.lastInsertedChanged.emit(text)
+
+    def set_audio_levels(self, levels: List[float]) -> None:
+        """Set audio levels for visualization (5 floats, 0.0-1.0)."""
+        self._audio_levels = levels
+        self.audioLevelsChanged.emit(levels)
+
+    @property
+    def audio_levels(self) -> List[float]:
+        return self._audio_levels
 
     def phase_title(self) -> str:
         return {

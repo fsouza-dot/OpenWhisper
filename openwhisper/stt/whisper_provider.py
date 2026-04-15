@@ -151,6 +151,6 @@ class FasterWhisperProvider:
         # faster-whisper does not return a single scalar confidence; use a
         # proxy: 1.0 by default, lowered if transcript is empty.
         confidence = 1.0 if text else 0.0
-        log.info("Transcribed %.2fs in language=%s text=%r",
-                 audio.duration, getattr(info, "language", "?"), text[:80])
+        log.info("Transcribed %.2fs in language=%s (%d chars)",
+                 audio.duration, getattr(info, "language", "?"), len(text))
         return Transcript(text=text, confidence=confidence, segments=segments)

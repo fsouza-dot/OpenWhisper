@@ -13,7 +13,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Callable, List, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from .config import settings_file_path
 from .logging_setup import get_logger
@@ -34,12 +34,6 @@ class STTProviderKind(str, Enum):
 class HotkeyMode(str, Enum):
     push_to_talk = "push_to_talk"
     toggle = "toggle"
-
-
-class CommandModeSetting(str, Enum):
-    always_on = "always_on"
-    modifier_held = "modifier_held"
-    wake_phrase = "wake_phrase"
 
 
 class PasteBehavior(str, Enum):
@@ -75,39 +69,63 @@ class HotkeyBinding(BaseModel):
 
 
 class DictionaryEntry(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    term: str
-    aliases: List[str] = Field(default_factory=list)
+    """Personal dictionary entry for STT hints.
+
+    Security: Field lengths are constrained to prevent DoS via large settings.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    term: str = Field(max_length=200)
+    aliases: List[str] = Field(default_factory=list, max_length=20)
     case_sensitive: bool = False
+
+    @field_validator("aliases")
+    @classmethod
+    def validate_aliases(cls, v: List[str]) -> List[str]:
+        return [a[:200] for a in v[:20]]  # Security: limit alias count and length
 
 
 class Snippet(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    trigger: str
-    replacement: str
+    """Text expansion snippet.
+
+    Security: Field lengths are constrained to prevent DoS via large settings.
+    """
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()), max_length=64)
+    trigger: str = Field(max_length=100)
+    replacement: str = Field(max_length=10000)  # Allow longer replacements (e.g., templates)
     trigger_is_phrase: bool = False
 
 
 class AppSettings(BaseModel):
-    input_device: Optional[str] = None  # device name, None = system default
+    """Application settings with security constraints.
+
+    Security: All string and list fields have length limits to prevent DoS
+    attacks via maliciously crafted settings files.
+    """
+    input_device: Optional[str] = Field(default=None, max_length=500)
     # ISO 639-1 codes the user wants whisper to transcribe. A single entry
     # forces that language; multiple entries enable auto-detection.
-    languages: List[str] = Field(default_factory=lambda: ["en"])
-    hotkeys: List[HotkeyBinding] = Field(default_factory=lambda: [HotkeyBinding()])
+    languages: List[str] = Field(default_factory=lambda: ["en"], max_length=10)
+    hotkeys: List[HotkeyBinding] = Field(default_factory=lambda: [HotkeyBinding()], max_length=10)
     hotkey_mode: HotkeyMode = HotkeyMode.push_to_talk
     dictation_mode: DictationMode = DictationMode.polished
     stt_provider: STTProviderKind = STTProviderKind.whisper
-    whisper_model_size: str = "small.en"  # tiny.en | base.en | small.en | medium.en
-    whisper_compute_type: str = "int8"    # int8 | int8_float16 | float16 | float32
-    groq_model: str = "whisper-large-v3-turbo"
+    whisper_model_size: str = Field(default="small.en", max_length=50)
+    whisper_compute_type: str = Field(default="int8", max_length=50)
+    groq_model: str = Field(default="whisper-large-v3-turbo", max_length=100)
     paste_behavior: PasteBehavior = PasteBehavior.simulate_paste
     restore_clipboard: bool = True
-    command_mode: CommandModeSetting = CommandModeSetting.always_on
-    dictionary: List[DictionaryEntry] = Field(default_factory=list)
-    snippets: List[Snippet] = Field(default_factory=list)
+    dictionary: List[DictionaryEntry] = Field(default_factory=list, max_length=500)
+    snippets: List[Snippet] = Field(default_factory=list, max_length=200)
     save_audio_history: bool = False
-    history_size: int = 20
+    history_size: int = Field(default=20, ge=1, le=100)
     confirm_destructive_commands: bool = True
+    auto_start: bool = False
+
+    @field_validator("languages")
+    @classmethod
+    def validate_languages(cls, v: List[str]) -> List[str]:
+        # Security: limit language codes to reasonable length
+        return [lang[:10] for lang in v[:10]]
 
     @model_validator(mode="before")
     @classmethod
@@ -175,10 +193,18 @@ class SettingsStore:
 
     # ------------------------------------------------------------- persistence
 
+    # Security: Maximum settings file size to prevent DoS
+    MAX_SETTINGS_SIZE = 1024 * 1024  # 1 MB
+
     def _load(self) -> AppSettings:
         if not self._path.exists():
             return AppSettings.default()
         try:
+            # Security: Check file size before reading
+            file_size = self._path.stat().st_size
+            if file_size > self.MAX_SETTINGS_SIZE:
+                log.warning("Settings file too large (%d bytes), using defaults", file_size)
+                return AppSettings.default()
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             return AppSettings.model_validate(raw)
         except Exception as exc:

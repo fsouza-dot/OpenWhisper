@@ -17,7 +17,6 @@ log = get_logger("cleanup.pipeline")
 class CleanupPipeline:
     def __init__(
         self,
-        llm_provider=None,
         heuristics: Optional[HeuristicCleanup] = None,
         command_interpreter: Optional[RegexCommandInterpreter] = None,
     ):

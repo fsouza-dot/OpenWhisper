@@ -115,8 +115,10 @@ class OpenWhisperApp(QObject):
             groq_key = self.secrets.get_groq_key()
             if groq_key:
                 try:
+                    # Security: Pass a callback to fetch the API key just-in-time
+                    # rather than holding it in memory for the provider's lifetime
                     self._stt_instance = GroqWhisperProvider(
-                        api_key=groq_key,
+                        api_key=self.secrets.get_groq_key,  # callback, not value
                         model=settings.groq_model,
                         languages=settings.languages,
                         on_usage=self.usage.record_audio_seconds,
@@ -145,7 +147,7 @@ class OpenWhisperApp(QObject):
         return self._stt_instance
 
     def _get_cleanup(self) -> CleanupPipeline:
-        return CleanupPipeline(llm_provider=None)
+        return CleanupPipeline()
 
     # ------------------------------------------------------- ui dialogs
 

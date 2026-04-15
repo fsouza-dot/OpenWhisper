@@ -36,6 +36,7 @@ class DictationCoordinator(QObject):
     _preview_signal = Signal(str)
     _inserted_signal = Signal(str)
     _schedule_idle_signal = Signal(int)
+    _audio_levels_signal = Signal(list)  # For real-time audio visualization
 
     def __init__(
         self,
@@ -67,6 +68,10 @@ class DictationCoordinator(QObject):
         self._preview_signal.connect(self._ui_state.set_live_preview)
         self._inserted_signal.connect(self._ui_state.set_last_inserted)
         self._schedule_idle_signal.connect(self._on_schedule_idle)
+        self._audio_levels_signal.connect(self._ui_state.set_audio_levels)
+
+        # Wire up audio levels from recorder
+        self._recorder.set_levels_callback(self._on_audio_levels)
 
     # ---------------------------------------------------------- lifecycle
 
@@ -272,6 +277,11 @@ class DictationCoordinator(QObject):
     @Slot(int)
     def _on_schedule_idle(self, delay_ms: int) -> None:
         QTimer.singleShot(delay_ms, lambda: self._ui_state.set_phase(Phase.idle, ""))
+
+    def _on_audio_levels(self, levels: list) -> None:
+        """Called from audio thread with microphone levels."""
+        # Emit signal to hop to Qt thread
+        self._audio_levels_signal.emit(levels)
 
 
 def _frontmost_app_name() -> Optional[str]:

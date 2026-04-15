@@ -81,6 +81,24 @@ class Platform(ABC):
         """Send Ctrl+V (Windows/Linux) or Cmd+V (macOS)."""
         ...
 
+    def is_startup_enabled(self) -> bool:
+        """Check if the app is set to run at OS startup.
+
+        Returns False if not supported on this platform.
+        """
+        return False
+
+    def set_startup_enabled(self, enabled: bool) -> bool:
+        """Enable or disable startup with the OS.
+
+        Returns True if the operation succeeded, False if failed or not supported.
+        """
+        return False
+
+    def supports_startup(self) -> bool:
+        """Check if this platform supports auto-start configuration."""
+        return False
+
 
 # Singleton instance
 _platform_instance: Optional[Platform] = None

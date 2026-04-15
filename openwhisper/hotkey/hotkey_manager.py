@@ -19,6 +19,7 @@ from typing import Callable, Iterable, List, Optional, Set
 
 from pynput import keyboard
 
+from ..keys import get_pynput_key
 from ..logging_setup import get_logger
 from ..settings import HotkeyBinding
 
@@ -33,19 +34,6 @@ _MODIFIER_MAP: dict[str, Set[keyboard.Key]] = {
     "shift":   {keyboard.Key.shift, keyboard.Key.shift_l, keyboard.Key.shift_r},
     "cmd":     {keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r},
     "win":     {keyboard.Key.cmd, keyboard.Key.cmd_l, keyboard.Key.cmd_r},
-}
-
-
-_NAMED_KEYS: dict[str, keyboard.Key] = {
-    "space": keyboard.Key.space,
-    "tab": keyboard.Key.tab,
-    "enter": keyboard.Key.enter,
-    "esc": keyboard.Key.esc,
-    "escape": keyboard.Key.esc,
-    "f1": keyboard.Key.f1, "f2": keyboard.Key.f2, "f3": keyboard.Key.f3,
-    "f4": keyboard.Key.f4, "f5": keyboard.Key.f5, "f6": keyboard.Key.f6,
-    "f7": keyboard.Key.f7, "f8": keyboard.Key.f8, "f9": keyboard.Key.f9,
-    "f10": keyboard.Key.f10, "f11": keyboard.Key.f11, "f12": keyboard.Key.f12,
 }
 
 
@@ -116,8 +104,9 @@ class HotkeyManager:
         target_key: object
         target_char: Optional[str] = None
         key_name = binding.key.lower()
-        if key_name in _NAMED_KEYS:
-            target_key = _NAMED_KEYS[key_name]
+        pynput_key = get_pynput_key(key_name)
+        if pynput_key is not None:
+            target_key = pynput_key
         elif len(key_name) == 1:
             target_key = keyboard.KeyCode.from_char(key_name)
             target_char = key_name

@@ -35,7 +35,6 @@ from ..languages import WHISPER_LANGUAGES, get_language_display
 from ..usage import UsageTracker, UsageSnapshot
 from ..settings import (
     AppSettings,
-    CommandModeSetting,
     DictationMode,
     DictionaryEntry,
     HotkeyBinding,
@@ -751,7 +750,6 @@ class SettingsWindow(QDialog):
 
         # Hotkey page
         self._hotkey_mode.currentIndexChanged.connect(self._auto_save)
-        self._command_mode.currentIndexChanged.connect(self._auto_save)
         self._confirm_destructive.stateChanged.connect(self._auto_save)
 
         # Advanced page
@@ -759,6 +757,8 @@ class SettingsWindow(QDialog):
         self._restore_clipboard.stateChanged.connect(self._auto_save)
         self._save_audio_history.stateChanged.connect(self._auto_save)
         self._history_size.valueChanged.connect(self._auto_save)
+        if hasattr(self, "_auto_start"):
+            self._auto_start.stateChanged.connect(self._on_auto_start_changed)
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QWidget()
@@ -1181,17 +1181,6 @@ class SettingsWindow(QDialog):
             self._hotkey_mode
         ))
 
-        self._command_mode = QComboBox()
-        self._command_mode.setFixedWidth(200)
-        for cm in CommandModeSetting:
-            self._command_mode.addItem(cm.value.replace("_", " ").title(), cm)
-        self._command_mode.setCurrentIndex(list(CommandModeSetting).index(self._draft.command_mode))
-        layout.addWidget(SettingCard(
-            "Command mode",
-            "How voice commands are processed",
-            self._command_mode
-        ))
-
         # Bindings section
         layout.addWidget(SectionHeader("Key Bindings"))
 
@@ -1318,8 +1307,40 @@ class SettingsWindow(QDialog):
             self._history_size
         ))
 
+        # System section (Windows only)
+        from ..platform import get_platform
+        platform = get_platform()
+        if platform.supports_startup():
+            layout.addWidget(SectionHeader("System"))
+
+            self._auto_start = QCheckBox()
+            # Sync with actual registry state, not just saved setting
+            self._auto_start.setChecked(platform.is_startup_enabled())
+            self._auto_start.stateChanged.connect(self._on_auto_start_changed)
+            layout.addWidget(SettingCard(
+                "Start with Windows",
+                "Automatically launch OpenWhisper when you sign in",
+                self._auto_start
+            ))
+
         layout.addStretch(1)
         return page
+
+    def _on_auto_start_changed(self, state: int) -> None:
+        """Handle auto-start checkbox change by updating the registry."""
+        from ..platform import get_platform
+        enabled = state == Qt.CheckState.Checked.value
+        platform = get_platform()
+        success = platform.set_startup_enabled(enabled)
+        if success:
+            self._draft.auto_start = enabled
+            self._store.replace(self._draft)
+            self._on_save()
+        else:
+            # Revert checkbox if registry update failed
+            self._auto_start.blockSignals(True)
+            self._auto_start.setChecked(platform.is_startup_enabled())
+            self._auto_start.blockSignals(False)
 
     # ============================================================== helpers
 
@@ -1376,7 +1397,6 @@ class SettingsWindow(QDialog):
                 bindings = [HotkeyBinding()]
             self._draft.hotkeys = bindings
             self._draft.hotkey_mode = self._hotkey_mode.currentData()
-            self._draft.command_mode = self._command_mode.currentData()
             self._draft.confirm_destructive_commands = self._confirm_destructive.isChecked()
             self._draft.paste_behavior = self._paste_behavior.currentData()
             self._draft.restore_clipboard = self._restore_clipboard.isChecked()

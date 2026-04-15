@@ -2,21 +2,31 @@
 from __future__ import annotations
 
 import math
+from typing import List
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QColor, QGuiApplication, QPainter, QPen
+from PySide6.QtGui import QColor, QGuiApplication, QPainter
 from PySide6.QtWidgets import QWidget
 
 from .ui_state import Phase, UIState
 
 
+# Set to False to use fake sine-wave animation instead of real audio levels
+USE_REAL_AUDIO_LEVELS = True
+
+
 class HUDWindow(QWidget):
-    """Simple HUD with animated audio waveform lines."""
+    """Simple HUD with audio waveform visualization.
+
+    When USE_REAL_AUDIO_LEVELS is True, bars reflect actual microphone input.
+    When False, uses a fake sine-wave animation (for rollback/testing).
+    """
 
     NUM_BARS = 5        # Number of vertical bars
     BAR_WIDTH = 3       # Width of each bar
     BAR_GAP = 4         # Gap between bars
-    MAX_BAR_HEIGHT = 20 # Maximum bar height
+    MAX_BAR_HEIGHT = 22 # Maximum bar height
+    MIN_BAR_HEIGHT = 2  # Minimum bar height
 
     def __init__(self, state: UIState):
         super().__init__(
@@ -36,10 +46,14 @@ class HUDWindow(QWidget):
         self._phase = Phase.idle
         self._time = 0
 
-        # Animation
+        # Real audio levels (0.0-1.0 for each bar)
+        self._target_levels: List[float] = [0.0] * self.NUM_BARS
+        self._display_levels: List[float] = [0.0] * self.NUM_BARS
+
+        # Animation timer (for smooth interpolation and fallback animation)
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._tick)
-        self._timer.setInterval(50)
+        self._timer.setInterval(30)  # ~33 FPS for smooth animation
 
         # Auto-hide
         self._hide_timer = QTimer(self)
@@ -48,8 +62,33 @@ class HUDWindow(QWidget):
 
         state.phaseChanged.connect(self._on_phase)
 
+        if USE_REAL_AUDIO_LEVELS:
+            state.audioLevelsChanged.connect(self._on_audio_levels)
+
+    def _on_audio_levels(self, levels: List[float]) -> None:
+        """Receive real audio levels from the microphone."""
+        if len(levels) >= self.NUM_BARS:
+            self._target_levels = levels[:self.NUM_BARS]
+
     def _tick(self) -> None:
-        self._time += 50
+        self._time += 30
+
+        if USE_REAL_AUDIO_LEVELS and self._phase == Phase.recording:
+            # Smooth interpolation toward target levels
+            for i in range(self.NUM_BARS):
+                target = self._target_levels[i]
+                current = self._display_levels[i]
+                # Fast rise, slower fall for natural feel
+                if target > current:
+                    self._display_levels[i] = current + (target - current) * 0.85
+                else:
+                    self._display_levels[i] = current + (target - current) * 0.6
+        else:
+            # Fake animation for non-recording phases or when disabled
+            for i in range(self.NUM_BARS):
+                phase_offset = i * 0.7
+                self._display_levels[i] = abs(math.sin(self._time / 120 + phase_offset))
+
         self.update()
 
     def paintEvent(self, _e) -> None:
@@ -73,9 +112,8 @@ class HUDWindow(QWidget):
         p.setBrush(QColor(255, 255, 255))
 
         for i in range(self.NUM_BARS):
-            # Animate each bar with different phase offset
-            phase_offset = i * 0.7
-            height = 4 + abs(math.sin(self._time / 120 + phase_offset)) * (self.MAX_BAR_HEIGHT - 4)
+            level = self._display_levels[i]
+            height = self.MIN_BAR_HEIGHT + level * (self.MAX_BAR_HEIGHT - self.MIN_BAR_HEIGHT)
 
             x = start_x + i * (self.BAR_WIDTH + self.BAR_GAP)
             y = cy - height / 2
@@ -94,6 +132,9 @@ class HUDWindow(QWidget):
 
         if phase == Phase.idle:
             self._timer.stop()
+            # Reset levels
+            self._target_levels = [0.0] * self.NUM_BARS
+            self._display_levels = [0.0] * self.NUM_BARS
             self._hide_timer.start(50)  # Hide almost immediately
         else:
             self._hide_timer.stop()

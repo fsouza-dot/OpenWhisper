@@ -8,7 +8,7 @@ stop(). Nothing is ever written to disk.
 from __future__ import annotations
 
 import threading
-from typing import List, Optional
+from typing import Callable, List, Optional
 
 import numpy as np
 import sounddevice as sd
@@ -23,6 +23,8 @@ log = get_logger("audio")
 SAMPLE_RATE = 16_000
 CHANNELS = 1
 BLOCK_SIZE = 1024
+NUM_LEVEL_BANDS = 5  # Number of bars in the visualizer
+RMS_GAIN_FACTOR = 20.0  # Scaling factor for RMS to make levels visible
 
 
 def resolve_input_device(name: Optional[str]) -> Optional[int]:
@@ -47,6 +49,7 @@ class AudioRecorder:
         self._lock = threading.Lock()
         self._is_recording = False
         self._device_name: Optional[str] = None
+        self._on_levels: Optional[Callable[[List[float]], None]] = None
 
     @property
     def is_recording(self) -> bool:
@@ -54,6 +57,13 @@ class AudioRecorder:
 
     def set_device(self, name: Optional[str]) -> None:
         self._device_name = name
+
+    def set_levels_callback(self, callback: Optional[Callable[[List[float]], None]]) -> None:
+        """Set callback to receive audio levels for visualization.
+
+        Callback receives a list of NUM_LEVEL_BANDS floats (0.0-1.0).
+        """
+        self._on_levels = callback
 
     def start(self) -> None:
         if self._is_recording:
@@ -108,3 +118,37 @@ class AudioRecorder:
         chunk = indata[:, 0].copy() if indata.ndim == 2 else indata.copy()
         with self._lock:
             self._chunks.append(chunk)
+
+        # Calculate audio levels for visualization
+        if self._on_levels is not None:
+            levels = self._calculate_levels(chunk)
+            try:
+                self._on_levels(levels)
+            except Exception:
+                pass  # Don't let visualization errors affect recording
+
+    def _calculate_levels(self, chunk: np.ndarray) -> List[float]:
+        """Calculate RMS levels for NUM_LEVEL_BANDS frequency-ish bands.
+
+        We split the chunk into bands and calculate RMS for each.
+        This gives a simple but effective audio visualizer.
+        """
+        chunk_len = len(chunk)
+        band_size = chunk_len // NUM_LEVEL_BANDS
+        levels: List[float] = []
+
+        for i in range(NUM_LEVEL_BANDS):
+            start = i * band_size
+            end = start + band_size if i < NUM_LEVEL_BANDS - 1 else chunk_len
+            band = chunk[start:end]
+
+            # Calculate RMS (root mean square) for this band
+            if len(band) > 0:
+                rms = float(np.sqrt(np.mean(band ** 2)))
+                # Scale and clamp to 0.0-1.0
+                level = min(1.0, rms * RMS_GAIN_FACTOR)
+            else:
+                level = 0.0
+            levels.append(level)
+
+        return levels

@@ -7,6 +7,7 @@ import time
 from typing import Optional
 
 from .. import Platform, PlatformType
+from ...keys import get_pynput_key
 from ...logging_setup import get_logger
 from ...protocols import TextInsertionProvider
 from .insertion import LinuxInserter
@@ -67,28 +68,7 @@ class LinuxPlatform(Platform):
 
     def send_key(self, key: str) -> None:
         """Send a keypress using pynput."""
-        from pynput.keyboard import Key
-
-        key_map = {
-            "enter": Key.enter,
-            "return": Key.enter,
-            "tab": Key.tab,
-            "escape": Key.esc,
-            "esc": Key.esc,
-            "backspace": Key.backspace,
-            "delete": Key.delete,
-            "space": Key.space,
-            "up": Key.up,
-            "down": Key.down,
-            "left": Key.left,
-            "right": Key.right,
-            "home": Key.home,
-            "end": Key.end,
-            "pageup": Key.page_up,
-            "pagedown": Key.page_down,
-        }
-
-        pynput_key = key_map.get(key.lower())
+        pynput_key = get_pynput_key(key)
         if pynput_key is None:
             log.warning("Unknown key: %s", key)
             return

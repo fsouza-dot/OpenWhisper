@@ -11,7 +11,8 @@ from typing import List, Optional, Protocol, runtime_checkable
 
 import numpy as np
 
-from .settings import AppSettings, DictationMode, DictionaryEntry, Snippet
+# Note: DictationMode and other settings types are used directly by the
+# cleanup pipeline rather than through these protocols.
 
 
 # ------------------------------------------------------------- value objects
@@ -42,15 +43,6 @@ class Transcript:
 
 
 @dataclass
-class CleanupInput:
-    raw_transcript: str
-    mode: DictationMode
-    dictionary: List[DictionaryEntry]
-    snippets: List[Snippet]
-    rewrite_hint: Optional[str] = None  # "professional" | "shorter" | None
-
-
-@dataclass
 class CleanupResult:
     cleaned: str
     command: Optional[str] = None   # DictationCommand.value, or None
@@ -74,13 +66,6 @@ class SpeechToTextProvider(Protocol):
     is_available: bool
 
     def transcribe(self, audio: AudioBuffer, dictionary_hints: List[str]) -> Transcript: ...
-
-
-@runtime_checkable
-class TextCleanupProvider(Protocol):
-    identifier: str
-
-    def clean(self, input: CleanupInput) -> CleanupResult: ...
 
 
 @runtime_checkable
