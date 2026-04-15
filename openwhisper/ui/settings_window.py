@@ -85,6 +85,86 @@ def _qt_key_to_name(key: int) -> str | None:
     return None
 
 
+# ==================== Language Flags ====================
+
+# Map language codes to flag emojis
+# Portuguese uses Brazilian flag as requested
+LANGUAGE_FLAGS: dict[str, str] = {
+    "en": "\U0001F1FA\U0001F1F8",  # US
+    "es": "\U0001F1EA\U0001F1F8",  # Spain
+    "fr": "\U0001F1EB\U0001F1F7",  # France
+    "de": "\U0001F1E9\U0001F1EA",  # Germany
+    "it": "\U0001F1EE\U0001F1F9",  # Italy
+    "pt": "\U0001F1E7\U0001F1F7",  # Brazil (as requested)
+    "nl": "\U0001F1F3\U0001F1F1",  # Netherlands
+    "pl": "\U0001F1F5\U0001F1F1",  # Poland
+    "ru": "\U0001F1F7\U0001F1FA",  # Russia
+    "uk": "\U0001F1FA\U0001F1E6",  # Ukraine
+    "ja": "\U0001F1EF\U0001F1F5",  # Japan
+    "ko": "\U0001F1F0\U0001F1F7",  # South Korea
+    "zh": "\U0001F1E8\U0001F1F3",  # China
+    "ar": "\U0001F1F8\U0001F1E6",  # Saudi Arabia
+    "cs": "\U0001F1E8\U0001F1FF",  # Czechia
+    "da": "\U0001F1E9\U0001F1F0",  # Denmark
+    "el": "\U0001F1EC\U0001F1F7",  # Greece
+    "fi": "\U0001F1EB\U0001F1EE",  # Finland
+    "he": "\U0001F1EE\U0001F1F1",  # Israel
+    "hi": "\U0001F1EE\U0001F1F3",  # India
+    "hu": "\U0001F1ED\U0001F1FA",  # Hungary
+    "id": "\U0001F1EE\U0001F1E9",  # Indonesia
+    "ms": "\U0001F1F2\U0001F1FE",  # Malaysia
+    "no": "\U0001F1F3\U0001F1F4",  # Norway
+    "ro": "\U0001F1F7\U0001F1F4",  # Romania
+    "sk": "\U0001F1F8\U0001F1F0",  # Slovakia
+    "sv": "\U0001F1F8\U0001F1EA",  # Sweden
+    "th": "\U0001F1F9\U0001F1ED",  # Thailand
+    "tr": "\U0001F1F9\U0001F1F7",  # Turkey
+    "vi": "\U0001F1FB\U0001F1F3",  # Vietnam
+    "af": "\U0001F1FF\U0001F1E6",  # South Africa
+    "az": "\U0001F1E6\U0001F1FF",  # Azerbaijan
+    "be": "\U0001F1E7\U0001F1FE",  # Belarus
+    "bg": "\U0001F1E7\U0001F1EC",  # Bulgaria
+    "bn": "\U0001F1E7\U0001F1E9",  # Bangladesh
+    "bs": "\U0001F1E7\U0001F1E6",  # Bosnia
+    "ca": "\U0001F1EA\U0001F1F8",  # Spain (Catalan)
+    "cy": "\U0001F3F4\U000E0067\U000E0062\U000E0077\U000E006C\U000E0073\U000E007F",  # Wales
+    "et": "\U0001F1EA\U0001F1EA",  # Estonia
+    "eu": "\U0001F1EA\U0001F1F8",  # Spain (Basque)
+    "fa": "\U0001F1EE\U0001F1F7",  # Iran
+    "gl": "\U0001F1EA\U0001F1F8",  # Spain (Galician)
+    "gu": "\U0001F1EE\U0001F1F3",  # India
+    "hr": "\U0001F1ED\U0001F1F7",  # Croatia
+    "hy": "\U0001F1E6\U0001F1F2",  # Armenia
+    "is": "\U0001F1EE\U0001F1F8",  # Iceland
+    "ka": "\U0001F1EC\U0001F1EA",  # Georgia
+    "kk": "\U0001F1F0\U0001F1FF",  # Kazakhstan
+    "kn": "\U0001F1EE\U0001F1F3",  # India
+    "lt": "\U0001F1F1\U0001F1F9",  # Lithuania
+    "lv": "\U0001F1F1\U0001F1FB",  # Latvia
+    "mk": "\U0001F1F2\U0001F1F0",  # North Macedonia
+    "ml": "\U0001F1EE\U0001F1F3",  # India
+    "mn": "\U0001F1F2\U0001F1F3",  # Mongolia
+    "mr": "\U0001F1EE\U0001F1F3",  # India
+    "mt": "\U0001F1F2\U0001F1F9",  # Malta
+    "ne": "\U0001F1F3\U0001F1F5",  # Nepal
+    "pa": "\U0001F1EE\U0001F1F3",  # India
+    "si": "\U0001F1F1\U0001F1F0",  # Sri Lanka
+    "sl": "\U0001F1F8\U0001F1EE",  # Slovenia
+    "sq": "\U0001F1E6\U0001F1F1",  # Albania
+    "sr": "\U0001F1F7\U0001F1F8",  # Serbia
+    "sw": "\U0001F1F0\U0001F1EA",  # Kenya
+    "ta": "\U0001F1EE\U0001F1F3",  # India
+    "te": "\U0001F1EE\U0001F1F3",  # India
+    "tl": "\U0001F1F5\U0001F1ED",  # Philippines
+    "ur": "\U0001F1F5\U0001F1F0",  # Pakistan
+}
+
+
+def get_flag(code: str) -> str:
+    """Get flag emoji for a language code, or globe if not found."""
+    return LANGUAGE_FLAGS.get(code, "\U0001F310")  # Globe as fallback
+
+
 # ==================== Windows 11 Style Constants ====================
 
 _WIN11_COLORS = {
@@ -311,7 +391,7 @@ class HotkeyCaptureButton(QPushButton):
 
 
 class LanguagePicker(QWidget):
-    """Dual-list language picker with arrow buttons."""
+    """Dual-list language picker with flags and arrow buttons."""
 
     MAX_LANGUAGES = 3
     changed = Signal()
@@ -322,77 +402,180 @@ class LanguagePicker(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
+        layout.setSpacing(16)
 
-        lists_row = QHBoxLayout()
-        lists_row.setSpacing(12)
-
-        # Left column
-        left_col = QVBoxLayout()
-        left_col.setSpacing(6)
-        lbl = QLabel("Available Languages")
-        lbl.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
-        left_col.addWidget(lbl)
+        # Search bar at top
+        search_row = QHBoxLayout()
+        search_icon = QLabel("\U0001F50D")
+        search_icon.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 14px;")
+        search_row.addWidget(search_icon)
         self._search = QLineEdit()
-        self._search.setPlaceholderText("Search...")
+        self._search.setPlaceholderText("Search languages...")
         self._search.textChanged.connect(self._filter_available)
         self._search.setClearButtonEnabled(True)
-        left_col.addWidget(self._search)
+        self._search.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {_WIN11_COLORS["input_bg"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 6px;
+                padding: 10px 14px;
+                font-size: 14px;
+            }}
+            QLineEdit:focus {{
+                border: 1px solid {_WIN11_COLORS["accent"]};
+            }}
+        """)
+        search_row.addWidget(self._search)
+        layout.addLayout(search_row)
+
+        lists_row = QHBoxLayout()
+        lists_row.setSpacing(16)
+
+        # Left column - Available
+        left_col = QVBoxLayout()
+        left_col.setSpacing(8)
+        lbl = QLabel("Available")
+        lbl.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px; font-weight: 600;")
+        left_col.addWidget(lbl)
         self._available_list = QListWidget()
         self._available_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._available_list.setFixedHeight(140)
+        self._available_list.setMinimumHeight(280)
         self._available_list.itemDoubleClicked.connect(self._add_selected_item)
+        self._available_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {_WIN11_COLORS["input_bg"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 8px;
+                padding: 4px;
+                font-size: 14px;
+            }}
+            QListWidget::item {{
+                padding: 10px 12px;
+                border-radius: 6px;
+                margin: 2px 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
         left_col.addWidget(self._available_list)
         lists_row.addLayout(left_col, 1)
 
         # Middle buttons
         btn_col = QVBoxLayout()
-        btn_col.setSpacing(8)
+        btn_col.setSpacing(12)
         btn_col.addStretch(1)
-        self._add_btn = QPushButton(">")
-        self._add_btn.setFixedSize(36, 30)
+        self._add_btn = QPushButton("\u2192")  # Right arrow
+        self._add_btn.setFixedSize(44, 44)
+        self._add_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+                border: none;
+                border-radius: 22px;
+                font-size: 18px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7ed6ff;
+            }}
+            QPushButton:disabled {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                color: {_WIN11_COLORS["text_dim"]};
+            }}
+        """)
         self._add_btn.clicked.connect(self._add_selected)
         btn_col.addWidget(self._add_btn)
-        self._remove_btn = QPushButton("<")
-        self._remove_btn.setFixedSize(36, 30)
+        self._remove_btn = QPushButton("\u2190")  # Left arrow
+        self._remove_btn.setFixedSize(44, 44)
+        self._remove_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {_WIN11_COLORS["bg_card"]};
+                color: {_WIN11_COLORS["text_primary"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 22px;
+                font-size: 18px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
         self._remove_btn.clicked.connect(self._remove_selected)
         btn_col.addWidget(self._remove_btn)
         btn_col.addStretch(1)
         lists_row.addLayout(btn_col)
 
-        # Right column
+        # Right column - Selected
         right_col = QVBoxLayout()
-        right_col.setSpacing(6)
+        right_col.setSpacing(8)
         lbl2 = QLabel("Selected (max 3)")
-        lbl2.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        lbl2.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px; font-weight: 600;")
         right_col.addWidget(lbl2)
-        right_col.addSpacing(32)
         self._selected_list = QListWidget()
         self._selected_list.setSelectionMode(QListWidget.SelectionMode.SingleSelection)
-        self._selected_list.setFixedHeight(140)
+        self._selected_list.setMinimumHeight(280)
         self._selected_list.itemDoubleClicked.connect(self._remove_selected_item)
+        self._selected_list.setStyleSheet(f"""
+            QListWidget {{
+                background-color: {_WIN11_COLORS["input_bg"]};
+                border: 1px solid {_WIN11_COLORS["border"]};
+                border-radius: 8px;
+                padding: 4px;
+                font-size: 14px;
+            }}
+            QListWidget::item {{
+                padding: 10px 12px;
+                border-radius: 6px;
+                margin: 2px 4px;
+            }}
+            QListWidget::item:selected {{
+                background-color: {_WIN11_COLORS["accent"]};
+                color: #000000;
+            }}
+            QListWidget::item:hover:!selected {{
+                background-color: {_WIN11_COLORS["bg_card_hover"]};
+            }}
+        """)
         right_col.addWidget(self._selected_list)
         lists_row.addLayout(right_col, 1)
 
         layout.addLayout(lists_row)
 
+        # Status with icon
+        status_row = QHBoxLayout()
+        self._status_icon = QLabel("\u2139")  # Info icon
+        self._status_icon.setStyleSheet(f"color: {_WIN11_COLORS['accent']}; font-size: 14px;")
+        status_row.addWidget(self._status_icon)
         self._status = QLabel()
-        self._status.setStyleSheet(f"color: {_WIN11_COLORS['text_dim']}; font-size: 11px;")
-        layout.addWidget(self._status)
+        self._status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
+        status_row.addWidget(self._status)
+        status_row.addStretch(1)
+        layout.addLayout(status_row)
 
         self._populate_lists()
         self._update_status()
+
+    def _get_display_with_flag(self, code: str) -> str:
+        """Get language display string with flag emoji."""
+        flag = get_flag(code)
+        display = get_language_display(code)
+        return f"{flag}  {display}"
 
     def _populate_lists(self) -> None:
         self._available_list.clear()
         self._selected_list.clear()
         for code, english, native in WHISPER_LANGUAGES:
             if code not in self._selected:
-                item = QListWidgetItem(get_language_display(code))
+                item = QListWidgetItem(self._get_display_with_flag(code))
                 item.setData(Qt.ItemDataRole.UserRole, code)
                 self._available_list.addItem(item)
         for code in self._selected:
-            item = QListWidgetItem(get_language_display(code))
+            item = QListWidgetItem(self._get_display_with_flag(code))
             item.setData(Qt.ItemDataRole.UserRole, code)
             self._selected_list.addItem(item)
 
@@ -589,6 +772,7 @@ class SettingsWindow(QDialog):
         # Stacked pages
         self._pages = QStackedWidget()
         self._pages.addWidget(self._build_general_page())
+        self._pages.addWidget(self._build_languages_page())
         self._pages.addWidget(self._build_microphone_page())
         self._pages.addWidget(self._build_hotkey_page())
         self._pages.addWidget(self._build_advanced_page())
@@ -628,9 +812,10 @@ class SettingsWindow(QDialog):
         self._nav_items: list[NavItem] = []
         nav_data = [
             ("General", 0),
-            ("Microphone", 1),
-            ("Hotkey", 2),
-            ("Advanced", 3),
+            ("Languages", 1),
+            ("Microphone", 2),
+            ("Hotkey", 3),
+            ("Advanced", 4),
         ]
 
         for text, page_idx in nav_data:
@@ -650,9 +835,10 @@ class SettingsWindow(QDialog):
     def _get_nav_icon(self, name: str) -> str:
         icons = {
             "General": "\u2699",     # gear
+            "Languages": "\U0001F310",  # globe
             "Microphone": "\U0001F3A4",  # microphone
             "Hotkey": "\u2328",      # keyboard
-            "Advanced": "\u2699",    # gear (different)
+            "Advanced": "\U0001F527",    # wrench
         }
         return icons.get(name, "\u2022")
 
@@ -746,32 +932,6 @@ class SettingsWindow(QDialog):
             self._mode_combo
         ))
 
-        # Language picker (full-width card)
-        lang_card = QFrame()
-        lang_card.setObjectName("settingCard")
-        lang_card.setStyleSheet(f"""
-            QFrame#settingCard {{
-                background-color: {_WIN11_COLORS["bg_card"]};
-                border-radius: 6px;
-            }}
-        """)
-        lang_layout = QVBoxLayout(lang_card)
-        lang_layout.setContentsMargins(16, 12, 16, 12)
-        lang_layout.setSpacing(8)
-
-        lang_title = QLabel("Languages")
-        lang_title.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 14px;")
-        lang_layout.addWidget(lang_title)
-
-        lang_desc = QLabel("Single language is forced (fastest). Multiple languages enable auto-detection.")
-        lang_desc.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px;")
-        lang_layout.addWidget(lang_desc)
-
-        self._language_picker = LanguagePicker(self._draft.languages)
-        lang_layout.addWidget(self._language_picker)
-
-        layout.addWidget(lang_card)
-
         # Speech-to-text section
         layout.addWidget(SectionHeader("Speech-to-Text Provider"))
 
@@ -860,6 +1020,48 @@ class SettingsWindow(QDialog):
             "int8 is fastest on CPU, float16 for CUDA",
             self._whisper_compute
         ))
+
+        layout.addStretch(1)
+        return page
+
+    # ========================================================= Languages
+
+    def _build_languages_page(self) -> QWidget:
+        page, layout = self._create_page("Languages", "Choose which languages to recognize")
+
+        # Info card at top
+        info_card = QFrame()
+        info_card.setObjectName("infoCard")
+        info_card.setStyleSheet(f"""
+            QFrame#infoCard {{
+                background-color: rgba(96, 205, 255, 0.1);
+                border: 1px solid {_WIN11_COLORS["accent"]};
+                border-radius: 8px;
+            }}
+        """)
+        info_layout = QHBoxLayout(info_card)
+        info_layout.setContentsMargins(16, 14, 16, 14)
+        info_layout.setSpacing(12)
+
+        info_icon = QLabel("\U0001F4A1")  # Light bulb
+        info_icon.setStyleSheet("font-size: 20px;")
+        info_layout.addWidget(info_icon)
+
+        info_text = QLabel(
+            "<b>Performance tip:</b> Selecting a single language forces that language "
+            "and provides the fastest transcription. Multiple languages enable "
+            "auto-detection per utterance but may be slightly slower."
+        )
+        info_text.setStyleSheet(f"color: {_WIN11_COLORS['text_primary']}; font-size: 13px;")
+        info_text.setWordWrap(True)
+        info_layout.addWidget(info_text, 1)
+
+        layout.addWidget(info_card)
+        layout.addSpacing(8)
+
+        # Language picker
+        self._language_picker = LanguagePicker(self._draft.languages)
+        layout.addWidget(self._language_picker)
 
         layout.addStretch(1)
         return page
