@@ -8,7 +8,7 @@ from typing import Callable
 
 import numpy as np
 import sounddevice as sd
-from PySide6.QtCore import Qt, QSize, QTimer, Signal
+from PySide6.QtCore import Qt, QSize, QTimer, Signal, Slot
 from PySide6.QtGui import QFont, QIcon
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -824,6 +824,7 @@ class SettingsWindow(QDialog):
         self._pages.addWidget(self._build_microphone_page())
         self._pages.addWidget(self._build_hotkey_page())
         self._pages.addWidget(self._build_advanced_page())
+        self._pages.addWidget(self._build_updates_page())
         content_layout.addWidget(self._pages, 1)
 
         main_layout.addWidget(content_container, 1)
@@ -890,9 +891,20 @@ class SettingsWindow(QDialog):
             color: {_WIN11_COLORS["text_primary"]};
             font-size: 20px;
             font-weight: 600;
-            padding: 0 0 20px 8px;
+            padding: 0 0 4px 8px;
         """)
         layout.addWidget(title)
+
+        # Version
+        from .. import __version__
+        version_label = QLabel(f"v{__version__}")
+        version_label.setStyleSheet(f"""
+            color: {_WIN11_COLORS["text_dim"]};
+            font-size: 11px;
+            font-weight: 400;
+            padding: 0 0 16px 8px;
+        """)
+        layout.addWidget(version_label)
 
         # Nav items
         self._nav_items: list[NavItem] = []
@@ -903,6 +915,7 @@ class SettingsWindow(QDialog):
             ("Microphone", 3),
             ("Hotkey", 4),
             ("Advanced", 5),
+            ("Updates", 6),
         ]
 
         for text, page_idx in nav_data:
@@ -927,6 +940,7 @@ class SettingsWindow(QDialog):
             "Microphone": "\U0001F3A4",  # microphone
             "Hotkey": "\u2328",      # keyboard
             "Advanced": "\U0001F527",    # wrench
+            "Updates": "\U0001F504",     # arrows circle (refresh/update)
         }
         return icons.get(name, "\u2022")
 
@@ -1581,6 +1595,100 @@ class SettingsWindow(QDialog):
             self._auto_start.blockSignals(True)
             self._auto_start.setChecked(platform.is_startup_enabled())
             self._auto_start.blockSignals(False)
+
+    # ============================================================== Updates
+
+    def _build_updates_page(self) -> QWidget:
+        page, layout = self._create_page("Updates", "Check for and install application updates")
+
+        from .. import __version__
+
+        layout.addWidget(SectionHeader("Current Version"))
+
+        version_label = QLabel(f"OpenWhisper v{__version__}")
+        version_label.setStyleSheet(f"""
+            color: {_WIN11_COLORS["text_primary"]};
+            font-size: 16px;
+            font-weight: 500;
+            padding: 8px 0;
+        """)
+        layout.addWidget(version_label)
+
+        layout.addWidget(SectionHeader("Check for Updates"))
+
+        self._update_status = QLabel("Click the button below to check for updates.")
+        self._update_status.setStyleSheet(f"color: {_WIN11_COLORS['text_secondary']}; font-size: 12px; padding: 4px 0;")
+        self._update_status.setWordWrap(True)
+        layout.addWidget(self._update_status)
+
+        self._check_updates_btn = QPushButton("Check for Updates")
+        self._check_updates_btn.setFixedWidth(180)
+        self._check_updates_btn.clicked.connect(self._on_check_updates)
+        layout.addWidget(self._check_updates_btn)
+
+        layout.addStretch(1)
+        return page
+
+    def _on_check_updates(self) -> None:
+        """Check for updates when button is clicked."""
+        from ..updater import check_for_updates
+
+        self._check_updates_btn.setEnabled(False)
+        self._update_status.setText("Checking for updates...")
+
+        # Run check in background
+        import threading
+        def check():
+            result = check_for_updates()
+            # Update UI on main thread
+            from PySide6.QtCore import QMetaObject, Qt
+            QMetaObject.invokeMethod(
+                self, "_on_update_check_result",
+                Qt.ConnectionType.QueuedConnection,
+            )
+            self._update_check_result = result
+
+        threading.Thread(target=check, daemon=True).start()
+
+    @Slot()
+    def _on_update_check_result(self) -> None:
+        """Handle update check result on main thread."""
+        self._check_updates_btn.setEnabled(True)
+
+        if not hasattr(self, "_update_check_result"):
+            self._update_status.setText("Update check failed.")
+            return
+
+        result = self._update_check_result
+        del self._update_check_result
+
+        if result.error:
+            self._update_status.setText(f"Error: {result.error}")
+        elif result.available and result.release_info:
+            self._update_status.setText(
+                f"Update available: v{result.latest_version}\n"
+                "Click below to download and install."
+            )
+            self._check_updates_btn.setText("Download Update")
+            self._check_updates_btn.clicked.disconnect()
+            self._check_updates_btn.clicked.connect(
+                lambda: self._show_update_dialog(result.current_version, result.release_info)
+            )
+        else:
+            self._update_status.setText(
+                f"You're up to date! (v{result.current_version})"
+            )
+
+    def _show_update_dialog(self, current_version: str, release_info) -> None:
+        """Show the update dialog."""
+        from .update_dialog import UpdateAvailableDialog
+        dlg = UpdateAvailableDialog(current_version, release_info, self)
+        dlg.exec()
+        # Reset button after dialog closes
+        self._check_updates_btn.setText("Check for Updates")
+        self._check_updates_btn.clicked.disconnect()
+        self._check_updates_btn.clicked.connect(self._on_check_updates)
+        self._update_status.setText("Click the button below to check for updates.")
 
     # ============================================================== helpers
 

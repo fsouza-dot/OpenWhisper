@@ -278,57 +278,42 @@ class Updater:
             return False, f"Download error: {exc}"
 
 
-def apply_pending_update() -> bool:
-    """Apply a pending ZIP update if one exists. Call at app startup."""
+def get_pending_update_version() -> Optional[str]:
+    """Check if there's a pending update and return its version, or None."""
     update_dir = app_data_dir() / "pending_update"
     marker = update_dir / "update_ready.txt"
 
     if not marker.exists():
-        return False
+        return None
 
     extract_dir = update_dir / "extracted"
     if not extract_dir.exists():
         shutil.rmtree(update_dir, ignore_errors=True)
-        return False
+        return None
 
     try:
-        exe_dir = get_exe_directory()
-        log.info("Applying pending update from %s to %s", extract_dir, exe_dir)
+        return marker.read_text(encoding="utf-8").strip()
+    except Exception:
+        return None
 
-        source_dirs = list(extract_dir.iterdir())
-        if len(source_dirs) == 1 and source_dirs[0].is_dir():
-            source_dir = source_dirs[0]
-        else:
-            source_dir = extract_dir
 
-        backup_dir = app_data_dir() / "update_backup"
-        if backup_dir.exists():
-            shutil.rmtree(backup_dir, ignore_errors=True)
-
-        for item in source_dir.iterdir():
-            dest = exe_dir / item.name
-            if dest.exists():
-                backup_dest = backup_dir / item.name
-                backup_dest.parent.mkdir(parents=True, exist_ok=True)
-                if dest.is_dir():
-                    shutil.copytree(dest, backup_dest)
-                else:
-                    shutil.copy2(dest, backup_dest)
-
-            if item.is_dir():
-                if dest.exists():
-                    shutil.rmtree(dest)
-                shutil.copytree(item, dest)
-            else:
-                shutil.copy2(item, dest)
-
+def cancel_pending_update() -> None:
+    """Cancel/remove a pending update without applying it."""
+    update_dir = app_data_dir() / "pending_update"
+    if update_dir.exists():
         shutil.rmtree(update_dir, ignore_errors=True)
-        shutil.rmtree(backup_dir, ignore_errors=True)
+        log.info("Pending update cancelled")
 
-        log.info("Update applied successfully")
-        return True
 
-    except Exception as exc:
-        log.exception("Failed to apply pending update: %s", exc)
-        shutil.rmtree(update_dir, ignore_errors=True)
-        return False
+def apply_pending_update() -> bool:
+    """Check if a pending update exists and is ready.
+
+    Note: The actual file copying is done in run.py before modules load,
+    so files aren't locked. This function is kept for compatibility but
+    the real work happens at startup.
+    """
+    update_dir = app_data_dir() / "pending_update"
+    marker = update_dir / "update_ready.txt"
+    extract_dir = update_dir / "extracted"
+
+    return marker.exists() and extract_dir.exists()

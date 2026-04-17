@@ -242,5 +242,15 @@ class UpdateAvailableDialog(QDialog):
 
     def _restart_app(self) -> None:
         import sys
-        import os
-        os.execv(sys.executable, [sys.executable] + sys.argv)
+        import subprocess
+
+        self._progress_label.setText("Restarting to apply update...")
+
+        # Launch new instance - it will apply the update before loading
+        subprocess.Popen(
+            [sys.executable],
+            creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+        )
+
+        # Exit current instance
+        sys.exit(0)

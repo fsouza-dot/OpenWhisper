@@ -11,7 +11,7 @@ import sys
 import threading
 from typing import Optional
 
-from PySide6.QtCore import QLockFile, QObject, Slot
+from PySide6.QtCore import QLockFile, QObject, Signal, Slot
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
@@ -34,15 +34,24 @@ from .ui.hud import HUDWindow
 from .ui.settings_window import SettingsWindow
 from .ui.tray import TrayIcon
 from .ui.ui_state import Phase, UIState
-from .updater import apply_pending_update, check_for_updates_async, UpdateResult
+from .updater import (
+    check_for_updates_async,
+    UpdateResult,
+)
 
 log = get_logger("app")
 
 
 class OpenWhisperApp(QObject):
+    # Signal to show update dialog on main thread
+    _update_available_signal = Signal(str, object)
+
     def __init__(self, qt_app: QApplication):
         super().__init__()
         self.qt_app = qt_app
+
+        # Connect signal to slot for thread-safe update dialog
+        self._update_available_signal.connect(self._show_update_dialog)
 
         # ---- persistence + secrets
         self.settings_store = SettingsStore()
@@ -107,8 +116,9 @@ class OpenWhisperApp(QObject):
             # First-run: no key yet. Show settings.
             self.show_settings()
 
-        # Check for updates in background
+        # Check for new updates in background
         check_for_updates_async(self._on_update_check_complete)
+
 
     # -------------------------------------------------- dynamic service build
 
@@ -182,7 +192,7 @@ class OpenWhisperApp(QObject):
         self.coordinator.reload_hotkey()
 
     def _on_update_check_complete(self, result: UpdateResult) -> None:
-        """Called when background update check finishes."""
+        """Called when background update check finishes (from background thread)."""
         if result.error:
             log.debug("Update check error: %s", result.error)
             return
@@ -194,17 +204,12 @@ class OpenWhisperApp(QObject):
             result.current_version,
             result.latest_version,
         )
-        self._pending_update_info = (result.current_version, result.release_info)
-        from PySide6.QtCore import QTimer
-        QTimer.singleShot(0, self._show_update_dialog)
+        # Emit signal to show dialog on main thread
+        self._update_available_signal.emit(result.current_version, result.release_info)
 
-    @Slot()
-    def _show_update_dialog(self) -> None:
+    @Slot(str, object)
+    def _show_update_dialog(self, current_version: str, release_info) -> None:
         """Show update dialog on main thread."""
-        if not hasattr(self, "_pending_update_info"):
-            return
-        current_version, release_info = self._pending_update_info
-        del self._pending_update_info
         from .ui.update_dialog import UpdateAvailableDialog
         dlg = UpdateAvailableDialog(current_version, release_info)
         dlg.exec()
@@ -223,9 +228,8 @@ class OpenWhisperApp(QObject):
 def run() -> int:
     setup_logging()
 
-    # Apply any pending update from a previous download
-    if apply_pending_update():
-        log.info("Pending update applied successfully")
+    # Note: We no longer auto-apply pending updates here.
+    # Instead, the app will ask the user via a dialog after startup.
 
     qt_app = QApplication(sys.argv)
     qt_app.setQuitOnLastWindowClosed(False)

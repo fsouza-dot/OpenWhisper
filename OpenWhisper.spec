@@ -16,7 +16,7 @@ datas = [
 binaries = []
 hiddenimports = []
 
-for pkg in ("faster_whisper", "ctranslate2", "tokenizers", "onnxruntime", "av"):
+for pkg in ("faster_whisper", "ctranslate2", "tokenizers", "onnxruntime", "av", "PySide6", "pydantic"):
     d, b, h = collect_all(pkg)
     datas += d
     binaries += b
