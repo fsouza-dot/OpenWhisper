@@ -36,7 +36,6 @@ Thumbs.db
 
 # ---------- Claude Code workspace files ----------
 .claude/
-CLAUDE.md
 
 # ---------- Secrets & user data ----------
 # Nothing in this repo should contain real keys, but guard rails:
