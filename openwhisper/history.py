@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import threading
 import uuid
+from collections import deque
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Deque, List, Optional
 
 
 @dataclass
@@ -21,14 +22,12 @@ class HistoryEntry:
 class DictationHistory:
     def __init__(self, capacity: int = 20):
         self.capacity = max(1, capacity)
-        self._entries: List[HistoryEntry] = []
+        self._entries: Deque[HistoryEntry] = deque(maxlen=self.capacity)
         self._lock = threading.RLock()
 
     def record(self, entry: HistoryEntry) -> None:
         with self._lock:
             self._entries.append(entry)
-            if len(self._entries) > self.capacity:
-                self._entries = self._entries[-self.capacity:]
 
     @property
     def last(self) -> Optional[HistoryEntry]:

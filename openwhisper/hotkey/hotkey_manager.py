@@ -86,6 +86,7 @@ class HotkeyManager:
         if self._listener is not None:
             try:
                 self._listener.stop()
+                self._listener.join(timeout=1.0)
             except Exception:  # pragma: no cover
                 pass
             self._listener = None

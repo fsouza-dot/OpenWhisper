@@ -124,8 +124,8 @@ class AudioRecorder:
             levels = self._calculate_levels(chunk)
             try:
                 self._on_levels(levels)
-            except Exception:
-                pass  # Don't let visualization errors affect recording
+            except Exception as exc:
+                log.debug("Audio levels callback error: %s", exc)
 
     def _calculate_levels(self, chunk: np.ndarray) -> List[float]:
         """Calculate RMS levels for NUM_LEVEL_BANDS frequency-ish bands.

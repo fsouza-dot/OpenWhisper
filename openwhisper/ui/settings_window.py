@@ -31,6 +31,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from ..config import asset_path
 from ..keyring_store import SecretStore
 from ..languages import WHISPER_LANGUAGES, get_language_display
 from ..usage import UsageTracker, UsageSnapshot
@@ -790,6 +791,10 @@ class SettingsWindow(QDialog):
         self.resize(900, 640)
         self.setStyleSheet(_WIN11_QSS)
 
+        icon_file = asset_path("icon.ico")
+        if icon_file.exists():
+            self.setWindowIcon(QIcon(str(icon_file)))
+
         self._store = store
         self._secrets = secrets
         self._usage = usage
@@ -827,9 +832,23 @@ class SettingsWindow(QDialog):
         self._test_recording: np.ndarray | None = None
         self._test_stream: sd.InputStream | None = None
         self._test_chunks: list[np.ndarray] = []
+        self._cached_devices: list | None = None
 
         # Connect all controls to auto-save
         self._connect_auto_save()
+
+    def closeEvent(self, event) -> None:
+        """Clean up resources when dialog closes."""
+        if hasattr(self, "_usage_timer") and self._usage_timer is not None:
+            self._usage_timer.stop()
+        if self._test_stream is not None:
+            try:
+                self._test_stream.stop()
+                self._test_stream.close()
+            except Exception:
+                pass
+            self._test_stream = None
+        super().closeEvent(event)
 
     def _connect_auto_save(self) -> None:
         """Connect all settings controls to auto-save on change."""
@@ -1282,12 +1301,13 @@ class SettingsWindow(QDialog):
         self._mic_combo.clear()
         self._mic_combo.addItem("System default", None)
         try:
-            devices = sd.query_devices()
+            self._cached_devices = sd.query_devices()
         except Exception as exc:
+            self._cached_devices = None
             self._mic_combo.addItem(f"<error: {exc}>", None)
             self._mic_combo.blockSignals(False)
             return
-        for dev in devices:
+        for dev in self._cached_devices:
             if dev.get("max_input_channels", 0) > 0:
                 name = dev.get("name", "?")
                 self._mic_combo.addItem(name, name)
@@ -1304,14 +1324,17 @@ class SettingsWindow(QDialog):
         device_name = self._mic_combo.currentData()
         device_index = None
         if device_name:
-            try:
-                for idx, dev in enumerate(sd.query_devices()):
-                    if dev.get("max_input_channels", 0) > 0 and dev.get("name") == device_name:
-                        device_index = idx
-                        break
-            except Exception as exc:
-                QMessageBox.critical(self, "Mic test failed", f"Could not query devices: {exc}")
-                return
+            devices = self._cached_devices
+            if devices is None:
+                try:
+                    devices = sd.query_devices()
+                except Exception as exc:
+                    QMessageBox.critical(self, "Mic test failed", f"Could not query devices: {exc}")
+                    return
+            for idx, dev in enumerate(devices):
+                if dev.get("max_input_channels", 0) > 0 and dev.get("name") == device_name:
+                    device_index = idx
+                    break
 
         sample_rate = 16_000
         self._test_chunks = []

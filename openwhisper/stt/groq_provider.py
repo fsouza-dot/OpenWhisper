@@ -82,6 +82,20 @@ class GroqWhisperProvider:
         self._load_error: Optional[str] = None
         self._lock = threading.Lock()
         self._on_usage = on_usage
+        self._closed = False
+
+    def __del__(self) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Close the HTTP client and release resources."""
+        if self._closed:
+            return
+        self._closed = True
+        try:
+            self._client.close()
+        except Exception:
+            pass
 
     @property
     def is_available(self) -> bool:

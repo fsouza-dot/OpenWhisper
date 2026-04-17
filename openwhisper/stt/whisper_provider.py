@@ -53,6 +53,21 @@ class FasterWhisperProvider:
         self._model = None
         self._model_lock = threading.Lock()
         self._load_error: Optional[str] = None
+        self._closed = False
+
+    def __del__(self) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Unload the model and release memory."""
+        if self._closed:
+            return
+        self._closed = True
+        with self._model_lock:
+            if self._model is not None:
+                del self._model
+                self._model = None
+                log.info("Whisper model unloaded")
 
     @property
     def is_available(self) -> bool:

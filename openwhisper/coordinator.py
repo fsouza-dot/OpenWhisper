@@ -134,6 +134,16 @@ class DictationCoordinator(QObject):
     # ------------------------------------------------------ worker pipeline
 
     def _run_pipeline(self, audio: AudioBuffer) -> None:
+        # Wrap entire pipeline in try/except to catch any uncaught exceptions.
+        # Without this, the worker thread dies silently and the HUD stays stuck.
+        try:
+            self._run_pipeline_inner(audio)
+        except Exception as exc:
+            log.exception("Uncaught pipeline error: %s", exc)
+            self._phase_signal.emit(Phase.error, "Unexpected error")
+            self._schedule_idle(1500)
+
+    def _run_pipeline_inner(self, audio: AudioBuffer) -> None:
         settings = self._settings_store.settings
         t0 = time.time()
 
@@ -144,7 +154,8 @@ class DictationCoordinator(QObject):
         # 1. STT
         try:
             stt = self._stt_factory()
-            hints = PersonalDictionary(settings.dictionary).stt_hints()
+            personal_dict = PersonalDictionary(settings.dictionary)
+            hints = personal_dict.stt_hints()
             transcript = stt.transcribe(audio, hints)
         except OpenWhisperError as exc:
             log.error("Transcription failed: %s", exc)
@@ -161,20 +172,23 @@ class DictationCoordinator(QObject):
             self._phase_signal.emit(Phase.idle, "")
             return
 
-        self._preview_signal.emit(transcript.text)
+        # 2. Apply dictionary replacements (aliases -> canonical terms)
+        transcript_text = personal_dict.apply(transcript.text)
+
+        self._preview_signal.emit(transcript_text)
         self._phase_signal.emit(Phase.cleaning, "")
 
-        # 2. Cleanup
+        # 3. Cleanup
         try:
             pipeline = self._cleanup_factory()
-            result = pipeline.run(transcript.text, settings)
+            result = pipeline.run(transcript_text, settings)
         except Exception as exc:
             log.exception("Cleanup failed: %s", exc)
             self._phase_signal.emit(Phase.error, "Cleanup failed")
             self._schedule_idle(1500)
             return
 
-        # 3. Commands
+        # 4. Commands
         command: Optional[DictationCommand] = None
         if result.command:
             try:
@@ -185,7 +199,7 @@ class DictationCoordinator(QObject):
         if command is not None:
             self._execute_command(command, settings)
 
-        # 4. Insertion
+        # 5. Insertion
         if result.cleaned:
             self._phase_signal.emit(Phase.inserting, "")
             try:

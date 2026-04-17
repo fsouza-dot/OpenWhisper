@@ -188,8 +188,15 @@ class SettingsStore:
     def replace(self, new: AppSettings) -> None:
         self.update(lambda _: new)
 
-    def subscribe(self, listener: Callable[[AppSettings], None]) -> None:
+    def subscribe(self, listener: Callable[[AppSettings], None]) -> Callable[[], None]:
+        """Subscribe to settings changes. Returns an unsubscribe function."""
         self._listeners.append(listener)
+        def unsubscribe() -> None:
+            try:
+                self._listeners.remove(listener)
+            except ValueError:
+                pass
+        return unsubscribe
 
     # ------------------------------------------------------------- persistence
 
@@ -214,6 +221,9 @@ class SettingsStore:
     def _save(self) -> None:
         try:
             self._path.parent.mkdir(parents=True, exist_ok=True)
-            self._path.write_text(self._settings.to_json(), encoding="utf-8")
+            # Atomic write: write to temp file first, then rename
+            temp_path = self._path.with_suffix(".tmp")
+            temp_path.write_text(self._settings.to_json(), encoding="utf-8")
+            temp_path.replace(self._path)
         except Exception as exc:
             log.error("Failed to save settings: %s", exc)
