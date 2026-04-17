@@ -7,41 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.3.5] - 2026-04-17
 
-### Added
-- Friendly error dialog when VC++ Redistributable is missing
-- MSI installer checks for VC++ runtime before installation
-- Version display in settings sidebar
-- Windows security warning instructions in README
+### Initial Release
 
-### Fixed
-- Quick press-release no longer produces hallucinated text (minimum duration check)
-- Silent recordings are now skipped (audio energy threshold)
-- Paste compatibility with Notepad, Notepad++, and terminals
+OpenWhisper is a local-first, privacy-respecting dictation assistant for Windows.
 
-### Changed
-- Removed auto-update system (will be redesigned later)
+### Features
+- **Push-to-talk dictation** - Hold Alt+Space, speak, release to insert text
+- **Toggle mode** - Alternative to push-to-talk for longer dictations
+- **Two STT backends** - Local faster-whisper or Groq cloud API
+- **Multilingual support** - 90+ languages supported
+- **Windows 11 style Settings UI** - Modern, clean interface
+- **History window** - Review and learn from past dictations
+- **Personal dictionary** - Custom word replacements and aliases
+- **Microphone selector** - Choose and test your input device
+- **System tray integration** - Runs quietly in the background
+- **Floating HUD** - Minimal recording indicator
+- **Groq usage tracking** - Monitor your free-tier API usage
 
-## [0.2.0] - 2026-04-15
+### Privacy & Security
+- Audio stays in RAM only - never written to disk
+- API keys stored in Windows Credential Manager
+- No telemetry or data collection
 
-### Added
-- Windows 11 style Settings UI
-- History window with correction learning
-- Dictionary settings page
-- Personal dictionary with aliases
-
-## [0.1.0] - 2026-04-13
-
-### Added
-- Initial open source release
-- Global push-to-talk hotkey (Alt+Space) with toggle mode option
-- Two STT backends: local faster-whisper and Groq cloud
-- Multilingual support (English + Portuguese)
-- Minimal floating HUD with animated recording indicator
-- System tray integration with settings access
-- Microphone selector with test functionality
-- Groq free-tier usage tracking
-- Privacy-first design: audio in RAM only, keys in Credential Manager
+### Compatibility
+- Works with Notepad, Notepad++, terminals, and other applications
+- Requires Microsoft Visual C++ Redistributable (installer checks automatically)
 
 ### Notes
-- Windows-only for now — Mac and Linux support planned
-- Vibecoded in an afternoon with cross-platform architecture in mind
+- Windows 10/11 only - Mac and Linux support planned for future releases
