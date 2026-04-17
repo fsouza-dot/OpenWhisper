@@ -38,6 +38,23 @@ python run.py
 
 Prebuilt binaries available in [Releases](../../releases).
 
+### Windows Security Warnings
+
+Since OpenWhisper is not yet code-signed, Windows may show security warnings. Here's how to run it:
+
+**For ZIP downloads:**
+1. Right-click the downloaded ZIP file → **Properties**
+2. Check **"Unblock"** at the bottom → Click **OK**
+3. Extract the ZIP and run `OpenWhisper.exe`
+
+**If you see "Windows protected your PC" (SmartScreen):**
+1. Click **"More info"**
+2. Click **"Run anyway"**
+
+**If you get a "Missing DLL" or "numpy C-extensions" error:**
+1. Install [Microsoft Visual C++ Redistributable (x64)](https://aka.ms/vs/17/release/vc_redist.x64.exe)
+2. Restart OpenWhisper
+
 ## Usage
 
 1. Launch — look for the tray icon
