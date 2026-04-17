@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="OpenWhisper"
+           Version="0.3.0.0"
+           Manufacturer="OpenWhisper Contributors"
+           UpgradeCode="8A5E3B2D-1F4C-4E6A-9B7D-2C8F5A3E1D0B"
+           Language="1033"
+           Codepage="1252"
+           InstallerVersion="500"
+           Scope="perMachine">
+
+    <SummaryInformation Description="OpenWhisper - Local-first dictation assistant for Windows"
+                        Manufacturer="OpenWhisper Contributors" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of OpenWhisper is already installed." />
+
+    <Media Id="1" Cabinet="OpenWhisper.cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="OpenWhisperIcon" SourceFile="assets\icon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="OpenWhisperIcon" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/fsouza-dot/OpenWhisper" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="OpenWhisper" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="OpenWhisper" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="DesktopFolder" />
+
+    <ComponentGroup Id="ProductComponents" Directory="INSTALLFOLDER">
+      <Files Include="dist\OpenWhisper\**" />
+    </ComponentGroup>
+
+    <Component Id="StartMenuShortcutComponent" Guid="2B3C4D5E-6F7A-8B9C-0D1E-2F3A4B5C6D7E" Directory="ApplicationProgramsFolder">
+      <Shortcut Id="StartMenuShortcut"
+                Name="OpenWhisper"
+                Target="[INSTALLFOLDER]OpenWhisper.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="OpenWhisperIcon" />
+      <RemoveFolder Id="RemoveStartMenuFolder" On="uninstall" />
+      <RegistryValue Root="HKCU" Key="Software\OpenWhisper" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Component Id="DesktopShortcutComponent" Guid="3C4D5E6F-7A8B-9C0D-1E2F-3A4B5C6D7E8F" Directory="DesktopFolder">
+      <Shortcut Id="DesktopShortcut"
+                Name="OpenWhisper"
+                Target="[INSTALLFOLDER]OpenWhisper.exe"
+                WorkingDirectory="INSTALLFOLDER"
+                Icon="OpenWhisperIcon" />
+      <RegistryValue Root="HKCU" Key="Software\OpenWhisper" Name="DesktopShortcut" Type="integer" Value="1" KeyPath="yes" />
+    </Component>
+
+    <Feature Id="ProductFeature" Title="OpenWhisper" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="StartMenuShortcutComponent" />
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+  </Package>
+</Wix>
