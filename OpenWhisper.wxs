@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="OpenWhisper"
-           Version="0.3.3.0"
+           Version="0.3.4.0"
            Manufacturer="OpenWhisper Contributors"
            UpgradeCode="8A5E3B2D-1F4C-4E6A-9B7D-2C8F5A3E1D0B"
            Language="1033"
@@ -19,6 +19,26 @@
     <Icon Id="OpenWhisperIcon" SourceFile="assets\icon.ico" />
     <Property Id="ARPPRODUCTICON" Value="OpenWhisperIcon" />
     <Property Id="ARPHELPLINK" Value="https://github.com/fsouza-dot/OpenWhisper" />
+
+    <!-- Check for Visual C++ Redistributable 2015-2022 (x64) -->
+    <Property Id="VCREDIST_INSTALLED">
+      <RegistrySearch Id="VCRedist_RegSearch"
+                      Root="HKLM"
+                      Key="SOFTWARE\Microsoft\VisualStudio\14.0\VC\Runtimes\x64"
+                      Name="Installed"
+                      Type="raw" />
+    </Property>
+
+    <!-- Alternative check via file existence -->
+    <Property Id="VCRUNTIME_EXISTS">
+      <DirectorySearch Id="SystemFolderSearch" Path="[System64Folder]">
+        <FileSearch Id="VCRuntime140Search" Name="vcruntime140.dll" />
+      </DirectorySearch>
+    </Property>
+
+    <!-- Launch condition: require VC++ Redistributable -->
+    <Launch Condition="VCREDIST_INSTALLED OR VCRUNTIME_EXISTS"
+            Message="OpenWhisper requires the Microsoft Visual C++ Redistributable (x64).&#13;&#13;Please download and install it from:&#13;https://aka.ms/vs/17/release/vc_redist.x64.exe&#13;&#13;Then run this installer again." />
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="OpenWhisper" />
