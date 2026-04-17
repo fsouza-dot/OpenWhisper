@@ -16,9 +16,9 @@ from ..logging_setup import get_logger
 from ..protocols import TextInsertionProvider
 
 # Timing constants (security: minimize clipboard exposure)
-CLIPBOARD_SETTLE_DELAY = 0.03  # Time for clipboard to be ready
-PASTE_COMPLETE_DELAY = 0.05   # Time for paste to complete
-CLIPBOARD_RESTORE_DELAY = 0.05  # Minimal delay before restoring
+CLIPBOARD_SETTLE_DELAY = 0.05  # Time for clipboard to be ready (increased for modern apps)
+PASTE_COMPLETE_DELAY = 0.08   # Time for paste to complete (increased for modern apps)
+CLIPBOARD_RESTORE_DELAY = 0.10  # Delay before restoring to ensure paste completes
 
 
 class BaseInserter(TextInsertionProvider, ABC):

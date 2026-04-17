@@ -9,9 +9,13 @@ from __future__ import annotations
 import ctypes
 from ctypes import wintypes
 
+from ...keys import get_scan_code
+
 # SendInput constants
 INPUT_KEYBOARD = 1
 KEYEVENTF_KEYUP = 0x0002
+KEYEVENTF_SCANCODE = 0x0008
+KEYEVENTF_EXTENDEDKEY = 0x0001
 
 # ULONG_PTR is pointer-sized (4 on 32-bit, 8 on 64-bit)
 ULONG_PTR = ctypes.c_size_t
@@ -67,13 +71,22 @@ class INPUT(ctypes.Structure):
 
 
 def make_key_input(vk: int, up: bool = False) -> INPUT:
-    """Create an INPUT struct for a key event."""
+    """Create an INPUT struct for a key event.
+
+    Includes scan codes for compatibility with modern Windows apps
+    like the new Notepad which may ignore pure virtual key input.
+    """
+    scan = get_scan_code(vk)
+    flags = 0
+    if up:
+        flags |= KEYEVENTF_KEYUP
+
     inp = INPUT()
     inp.type = INPUT_KEYBOARD
     inp.u.ki = KEYBDINPUT(
         wVk=vk,
-        wScan=0,
-        dwFlags=KEYEVENTF_KEYUP if up else 0,
+        wScan=scan,
+        dwFlags=flags,
         time=0,
         dwExtraInfo=0,
     )

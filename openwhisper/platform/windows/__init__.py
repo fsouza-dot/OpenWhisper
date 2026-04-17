@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import ctypes
 import time
+from ctypes import wintypes
 from typing import Optional
 
 from .. import Platform, PlatformType
@@ -14,6 +15,9 @@ from .startup import is_startup_enabled, set_startup_enabled
 from .win32_input import INPUT, KEYEVENTF_KEYUP, make_key_input, send_input
 
 log = get_logger("platform.windows")
+
+# Windows messages for clipboard operations
+WM_PASTE = 0x0302
 
 
 class WindowsPlatform(Platform):
@@ -88,15 +92,88 @@ class WindowsPlatform(Platform):
 # Win32 SendInput implementation
 # --------------------------------------------------------------------------
 
-# Timing constant for modifier release delay
+# Timing constants
 MODIFIER_RELEASE_DELAY = 0.02  # 20ms
+FOCUS_SETTLE_DELAY = 0.03  # 30ms for window focus to settle
 
 
 def _send_paste_windows() -> None:
-    """Send Ctrl+V via SendInput."""
+    """Send paste command to the foreground window.
+
+    Strategy: Check if the focused window is a Scintilla control (used by Notepad++).
+    If so, use WM_PASTE. Otherwise, use SendInput Ctrl+V.
+    """
     _force_release_modifiers()
     time.sleep(MODIFIER_RELEASE_DELAY)
 
+    user32 = ctypes.windll.user32
+
+    # Get foreground window
+    hwnd = user32.GetForegroundWindow()
+    if not hwnd:
+        log.warning("No foreground window found")
+        _send_ctrl_v()
+        return
+
+    # Small delay to ensure window is ready
+    time.sleep(FOCUS_SETTLE_DELAY)
+
+    # Check if we should use WM_PASTE (for Scintilla-based editors)
+    if _should_use_wm_paste(user32, hwnd):
+        if _try_send_wm_paste(user32, hwnd):
+            return
+
+    # Default: use SendInput Ctrl+V
+    _send_ctrl_v()
+
+
+def _should_use_wm_paste(user32, hwnd) -> bool:
+    """Check if the focused control needs WM_PASTE (e.g., Scintilla)."""
+    try:
+        target_thread_id = user32.GetWindowThreadProcessId(hwnd, None)
+        current_thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+
+        if target_thread_id and target_thread_id != current_thread_id:
+            if user32.AttachThreadInput(current_thread_id, target_thread_id, True):
+                try:
+                    focused = user32.GetFocus()
+                    if focused:
+                        # Get window class name
+                        class_name = ctypes.create_unicode_buffer(256)
+                        user32.GetClassNameW(focused, class_name, 256)
+                        class_str = class_name.value.lower()
+                        # Scintilla is used by Notepad++, SciTE, and other editors
+                        if "scintilla" in class_str:
+                            return True
+                finally:
+                    user32.AttachThreadInput(current_thread_id, target_thread_id, False)
+    except Exception:
+        pass
+    return False
+
+
+def _try_send_wm_paste(user32, hwnd) -> bool:
+    """Send WM_PASTE to the focused control. Returns True if successful."""
+    try:
+        target_thread_id = user32.GetWindowThreadProcessId(hwnd, None)
+        current_thread_id = ctypes.windll.kernel32.GetCurrentThreadId()
+
+        if target_thread_id and target_thread_id != current_thread_id:
+            if user32.AttachThreadInput(current_thread_id, target_thread_id, True):
+                try:
+                    focused = user32.GetFocus()
+                    target = focused if focused else hwnd
+                    user32.SendMessageW(target, WM_PASTE, 0, 0)
+                    return True
+                finally:
+                    user32.AttachThreadInput(current_thread_id, target_thread_id, False)
+    except Exception as exc:
+        log.debug("WM_PASTE failed: %s", exc)
+    return False
+
+
+def _send_ctrl_v() -> None:
+    """Send Ctrl+V via SendInput."""
     sent = send_input(
         make_key_input(WIN32_VK_CONTROL, up=False),
         make_key_input(WIN32_VK_CODES["v"], up=False),
