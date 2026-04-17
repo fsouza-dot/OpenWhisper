@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="OpenWhisper"
-           Version="0.3.4.0"
+           Version="0.3.5.0"
            Manufacturer="OpenWhisper Contributors"
            UpgradeCode="8A5E3B2D-1F4C-4E6A-9B7D-2C8F5A3E1D0B"
            Language="1033"

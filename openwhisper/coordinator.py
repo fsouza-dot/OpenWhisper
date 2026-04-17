@@ -13,6 +13,8 @@ import threading
 import time
 from typing import Callable, Optional
 
+import numpy as np
+
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 
 from .cleanup.pipeline import CleanupPipeline
@@ -28,6 +30,12 @@ from .settings import AppSettings, HotkeyMode, SettingsStore
 from .ui.ui_state import Phase, UIState
 
 log = get_logger("coordinator")
+
+# Minimum recording duration to avoid Whisper hallucinations on quick press-release
+MIN_RECORDING_SECONDS = 0.3
+
+# Minimum audio energy (RMS) to consider as speech vs silence
+MIN_AUDIO_RMS = 0.005
 
 
 class DictationCoordinator(QObject):
@@ -148,6 +156,19 @@ class DictationCoordinator(QObject):
         t0 = time.time()
 
         if audio.samples.size == 0:
+            self._phase_signal.emit(Phase.idle, "")
+            return
+
+        # Skip very short recordings (quick press-release causes hallucinations)
+        if audio.duration < MIN_RECORDING_SECONDS:
+            log.debug("Recording too short (%.2fs), skipping", audio.duration)
+            self._phase_signal.emit(Phase.idle, "")
+            return
+
+        # Skip silent recordings (no actual speech)
+        rms = float(np.sqrt(np.mean(audio.samples ** 2)))
+        if rms < MIN_AUDIO_RMS:
+            log.debug("Recording too quiet (RMS=%.4f), skipping", rms)
             self._phase_signal.emit(Phase.idle, "")
             return
 

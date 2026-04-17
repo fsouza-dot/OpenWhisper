@@ -58,3 +58,5 @@ logs/
 # ---------- OS junk ----------
 desktop.ini
 dist_test/
+dist_dev/
+dist_final/
