@@ -6,6 +6,14 @@ Hold a hotkey, speak, release — your text lands in whatever app you were using
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](https://www.python.org/downloads/)
 
+🌐 **[Website](https://fsouza-dot.github.io/OpenWhisper/)** · 📦 **[Download](https://github.com/fsouza-dot/OpenWhisper/releases)**
+
+---
+
+<p align="center">
+  <img src="docs/openwhisper.gif" alt="OpenWhisper demo" width="600">
+</p>
+
 ---
 
 ## Features
