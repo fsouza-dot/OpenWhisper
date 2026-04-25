@@ -25,18 +25,23 @@ Hold a hotkey, speak, release — your text lands in whatever app you were using
 
 ## Install
 
-**Requirements:** Windows 10/11, Python 3.11+
+**Requirements:** Windows 10/11, macOS 12+ (Apple Silicon), or Linux. Python 3.11+ for source builds.
 
-```powershell
+Prebuilt binaries available in [Releases](../../releases):
+
+- **Windows** — `OpenWhisper.exe` (see [Windows Security Warnings](#windows-security-warnings))
+- **macOS** — `OpenWhisper-arm64.dmg` (see [MACOS.md](MACOS.md))
+- **Linux** — `OpenWhisper-linux.tar.gz`
+
+From source:
+
+```bash
 git clone https://github.com/fsouza-dot/OpenWhisper.git
 cd OpenWhisper
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
+python -m venv .venv && source .venv/bin/activate    # Windows: .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 python run.py
 ```
-
-Prebuilt binaries available in [Releases](../../releases).
 
 ### Windows Security Warnings
 
@@ -65,11 +70,11 @@ See [USAGE.md](USAGE.md) for details.
 
 ## Configuration
 
-| Item | Location |
-|------|----------|
-| Settings | `%APPDATA%\OpenWhisper\settings.json` |
-| Logs | `%APPDATA%\OpenWhisper\openwhisper.log` |
-| API keys | Windows Credential Manager |
+| Item | Windows | macOS | Linux |
+|------|---------|-------|-------|
+| Settings | `%APPDATA%\OpenWhisper\settings.json` | `~/Library/Application Support/OpenWhisper/settings.json` | `~/.local/share/OpenWhisper/settings.json` |
+| Logs | `%APPDATA%\OpenWhisper\openwhisper.log` | `~/Library/Application Support/OpenWhisper/openwhisper.log` | `~/.local/share/OpenWhisper/openwhisper.log` |
+| API keys | Credential Manager | Keychain | SecretService / kwallet |
 
 ## Building
 

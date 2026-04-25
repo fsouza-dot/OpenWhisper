@@ -113,14 +113,15 @@ Get-Content "$env:APPDATA\OpenWhisper\openwhisper.log" -Wait
 
 ## Platform-Specific Code
 
-Most of the codebase is cross-platform Python. Platform-specific bits live in:
+Most of the codebase is cross-platform Python. Platform-specific bits
+live under `openwhisper/platform/{windows,linux,macos}/` and plug into
+the `Platform` ABC in `openwhisper/platform/__init__.py`.
 
-| Directory | Purpose | Platform Status |
-|-----------|---------|-----------------|
-| `openwhisper/hotkey/` | Global hotkey registration | Windows only |
-| `openwhisper/insertion/` | Clipboard + paste simulation | Windows only |
-
-If you're adding Mac or Linux support, these are the main areas to focus on.
+| Platform | Build spec | Build script | Notes |
+|----------|------------|--------------|-------|
+| Windows | `OpenWhisper.spec` | (see top of file) | Win32 SendInput for paste |
+| Linux | `OpenWhisper-linux.spec` | `build-linux.sh` | pynput + xdotool fallback |
+| macOS (arm64) | `OpenWhisper-macos.spec` | `build-macos.sh` | Quartz CGEvent for paste; see [MACOS.md](MACOS.md) |
 
 ## Dependencies
 

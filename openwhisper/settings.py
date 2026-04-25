@@ -44,11 +44,28 @@ class PasteBehavior(str, Enum):
 class HotkeyBinding(BaseModel):
     """A single global hotkey chord.
 
-    `key` is the pynput key name, e.g. "space", "f9", "a".
-    `modifiers` is a list of "ctrl", "alt", "shift", "cmd" (cmd = Win key).
+    ``key`` is the pynput key name, e.g. "space", "f9", "a". ``modifiers``
+    is a list of canonical modifier names: "ctrl", "alt", "shift", "cmd".
+    Storage is platform-agnostic; the keyboard label shown to the user is
+    computed at display time (``Cmd``/``⌘`` on macOS, ``Win`` on Windows,
+    ``Super`` on Linux).
     """
     key: str = "space"
     modifiers: List[str] = Field(default_factory=lambda: ["alt"])
+
+    @field_validator("modifiers")
+    @classmethod
+    def _canonicalize_modifiers(cls, value: List[str]) -> List[str]:
+        from .hotkey.display import canonical_modifier
+        out: list[str] = []
+        for entry in value:
+            canon = canonical_modifier(entry)
+            if canon is None:
+                log.warning("Dropping unknown hotkey modifier: %r", entry)
+                continue
+            if canon not in out:
+                out.append(canon)
+        return out
 
     def pynput_hotkey_string(self) -> str:
         """Render to pynput's global hotkey format, e.g. "<alt>+<space>"."""
@@ -62,10 +79,9 @@ class HotkeyBinding(BaseModel):
         return "+".join(parts)
 
     def display(self) -> str:
-        """Human-friendly label, e.g. 'Alt + Space'."""
-        parts = [m.capitalize() if m != "cmd" else "Win" for m in self.modifiers]
-        parts.append(self.key.upper() if len(self.key) == 1 else self.key.capitalize())
-        return " + ".join(parts)
+        """Human-friendly label rendered for the current platform."""
+        from .hotkey.display import format_chord
+        return format_chord(self.modifiers, self.key)
 
 
 class DictionaryEntry(BaseModel):

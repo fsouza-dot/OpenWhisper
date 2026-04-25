@@ -5,6 +5,15 @@ All notable changes to OpenWhisper will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- **macOS support** (Apple Silicon). Native `.app` bundle distributed as
+  `OpenWhisper-arm64.dmg`. Keyboard injection uses Quartz CGEvent for
+  reliable paste in browsers and Electron apps. Launch-at-login via
+  LaunchAgents. First-launch Accessibility permission prompt. See
+  [MACOS.md](MACOS.md).
+
 ## [0.3.5] - 2026-04-17
 
 ### Initial Release
@@ -34,4 +43,4 @@ OpenWhisper is a local-first, privacy-respecting dictation assistant for Windows
 - Requires Microsoft Visual C++ Redistributable (installer checks automatically)
 
 ### Notes
-- Windows 10/11 only - Mac and Linux support planned for future releases
+- Initial release: Windows 10/11. macOS and Linux support arrived in subsequent releases.

@@ -1,47 +1,99 @@
-"""macOS platform implementation (placeholder).
+"""macOS platform implementation.
 
-TODO: Implement macOS-specific functionality:
-- Cmd+V paste simulation (not Ctrl+V)
-- Foreground app detection via NSWorkspace
-- Accessibility permissions handling
+Keyboard injection uses Quartz CGEvent (see ``cgevent``) instead of
+pynput because pynput-on-Darwin silently drops events in browsers and
+Electron apps. Foreground-app detection uses NSWorkspace. Autostart is
+implemented via LaunchAgents.
 """
 from __future__ import annotations
 
 from typing import Optional
 
 from .. import Platform, PlatformType
-from ...keys import get_pynput_key
 from ...logging_setup import get_logger
 from ...protocols import TextInsertionProvider
+from . import cgevent, startup
 
 log = get_logger("platform.macos")
 
 
-class MacOSPlatform(Platform):
-    """macOS-specific platform implementation.
-
-    NOTE: This is a placeholder. macOS support is not yet implemented.
+def configure_accessory_app() -> None:
+    """Set NSApplicationActivationPolicyAccessory so the app cannot become
+    the active app and never steals keyboard focus from the user's
+    foreground window. Qt's QApplication forces Regular policy at startup
+    regardless of LSUIElement, so this must be called after QApplication
+    is constructed.
     """
+    try:
+        from AppKit import (
+            NSApplication,
+            NSApplicationActivationPolicyAccessory,
+        )
+        app = NSApplication.sharedApplication()
+        if app is None:
+            log.warning("NSApplication.sharedApplication() returned None")
+            return
+        before = int(app.activationPolicy())
+        ok = bool(app.setActivationPolicy_(NSApplicationActivationPolicyAccessory))
+        after = int(app.activationPolicy())
+        log.info(
+            "Activation policy: before=%d after=%d ok=%s (target=Accessory=%d)",
+            before, after, ok, int(NSApplicationActivationPolicyAccessory),
+        )
+    except Exception as exc:
+        log.warning("Failed to set accessory activation policy: %s", exc)
 
+
+def make_window_non_activating(qwidget) -> None:
+    """Reach through Qt to the underlying NSWindow and configure it so
+    showing or raising it never activates the app or pulls focus.
+
+    Required because Qt's ``WA_ShowWithoutActivating`` is honored on
+    ``show()`` but ``raise_()`` and the first-window-show heuristic on
+    macOS still activate the app.
+    """
+    try:
+        import ctypes
+        import objc
+        from AppKit import (
+            NSWindowCollectionBehaviorTransient,
+            NSWindowCollectionBehaviorIgnoresCycle,
+            NSWindowCollectionBehaviorFullScreenAuxiliary,
+            NSFloatingWindowLevel,
+        )
+        # Force native window creation so winId() returns an NSView pointer.
+        qwidget.winId()
+        handle = qwidget.windowHandle()
+        if handle is None:
+            return
+        ns_view_ptr = int(qwidget.winId())
+        ns_view = objc.objc_object(c_void_p=ctypes.c_void_p(ns_view_ptr))
+        ns_window = ns_view.window()
+        if ns_window is None:
+            return
+        ns_window.setCollectionBehavior_(
+            NSWindowCollectionBehaviorTransient
+            | NSWindowCollectionBehaviorIgnoresCycle
+            | NSWindowCollectionBehaviorFullScreenAuxiliary
+        )
+        ns_window.setLevel_(NSFloatingWindowLevel)
+        # Most important: panels that don't accept becoming "key" never
+        # pull focus from the user's foreground app.
+        if hasattr(ns_window, "setCanBecomeKey_"):
+            ns_window.setCanBecomeKey_(False)
+        ns_window.setHidesOnDeactivate_(False)
+    except Exception as exc:
+        log.debug("make_window_non_activating failed: %s", exc)
+
+
+class MacOSPlatform(Platform):
     platform_type = PlatformType.macos
-
-    def __init__(self):
-        log.warning("macOS support is not yet fully implemented")
-        self._keyboard = None
-
-    def _get_keyboard(self):
-        """Lazy-load pynput keyboard controller."""
-        if self._keyboard is None:
-            from pynput.keyboard import Controller
-            self._keyboard = Controller()
-        return self._keyboard
 
     def create_inserter(
         self,
         restore_clipboard: bool = True,
         use_clipboard: bool = True,
     ) -> TextInsertionProvider:
-        """Create a macOS text inserter."""
         from .insertion import MacOSInserter
         return MacOSInserter(
             restore_clipboard=restore_clipboard,
@@ -49,41 +101,31 @@ class MacOSPlatform(Platform):
         )
 
     def get_foreground_app(self) -> Optional[str]:
-        """Get the foreground application name.
-
-        TODO: Use NSWorkspace.sharedWorkspace().frontmostApplication()
-        """
         try:
-            # Attempt to use AppKit if available
             from AppKit import NSWorkspace
             app = NSWorkspace.sharedWorkspace().frontmostApplication()
-            return app.localizedName()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-
-        return None
+            if app is None:
+                return None
+            return str(app.localizedName())
+        except Exception as exc:
+            log.debug("get_foreground_app failed: %s", exc)
+            return None
 
     def send_key(self, key: str) -> None:
-        """Send a keypress using pynput."""
-        pynput_key = get_pynput_key(key)
-        if pynput_key is None:
+        keycode = cgevent.keycode_for(key)
+        if keycode is None:
             log.warning("Unknown key: %s", key)
             return
-
-        kb = self._get_keyboard()
-        kb.press(pynput_key)
-        kb.release(pynput_key)
+        cgevent.post_key(keycode)
 
     def send_paste(self) -> None:
-        """Send Cmd+V using pynput (macOS uses Cmd, not Ctrl)."""
-        from pynput.keyboard import Key
+        cgevent.post_paste()
 
-        kb = self._get_keyboard()
+    def supports_startup(self) -> bool:
+        return True
 
-        # macOS uses Cmd (Key.cmd) instead of Ctrl
-        kb.press(Key.cmd)
-        kb.press('v')
-        kb.release('v')
-        kb.release(Key.cmd)
+    def is_startup_enabled(self) -> bool:
+        return startup.is_enabled()
+
+    def set_startup_enabled(self, enabled: bool) -> bool:
+        return startup.enable() if enabled else startup.disable()

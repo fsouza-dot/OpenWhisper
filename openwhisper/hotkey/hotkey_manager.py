@@ -63,20 +63,28 @@ class HotkeyManager:
         self._chords: List[_Chord] = []
         self._active_count = 0
         self._lock = threading.Lock()
+        self._first_event_logged = False
 
     def register(self, bindings: Iterable[HotkeyBinding]) -> None:
-        self.unregister()
-        self._chords = [self._compile(b) for b in bindings]
-        self._held = set()
-        self._active_count = 0
-        if not self._chords:
+        bindings = list(bindings)
+        new_chords = [self._compile(b) for b in bindings]
+        # Hot-swap the chord list under the lock so a press/release event
+        # in flight always sees a consistent set. The pynput Listener
+        # stays alive across re-registrations: tearing it down and
+        # recreating it crashes on macOS (CGEventTap race in CFRunLoop).
+        with self._lock:
+            self._chords = new_chords
+            self._held = set()
+            self._active_count = 0
+            if self._listener is None and new_chords:
+                self._listener = keyboard.Listener(
+                    on_press=self._on_press, on_release=self._on_release
+                )
+                self._listener.daemon = True
+                self._listener.start()
+        if not new_chords:
             log.warning("No hotkey bindings registered")
             return
-        self._listener = keyboard.Listener(
-            on_press=self._on_press, on_release=self._on_release
-        )
-        self._listener.daemon = True
-        self._listener.start()
         log.info(
             "Hotkeys registered: %s",
             ", ".join(b.pynput_hotkey_string() for b in bindings),
@@ -140,6 +148,9 @@ class HotkeyManager:
 
     def _on_press(self, key) -> None:
         with self._lock:
+            if not self._first_event_logged:
+                self._first_event_logged = True
+                log.info("Listener received first keypress — accessibility OK")
             norm = self._normalize(key)
             self._held.add(norm)
             if key not in self._held:

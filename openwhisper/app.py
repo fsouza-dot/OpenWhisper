@@ -61,6 +61,13 @@ class OpenWhisperApp(QObject):
         )
         self.hotkey = HotkeyManager()
         self._platform = get_platform()
+        if sys.platform == "darwin":
+            from .platform.macos.accessibility import prompt_for_trust
+            if not prompt_for_trust():
+                log.warning(
+                    "Accessibility permission not granted — hotkeys and "
+                    "paste will not work until enabled in System Settings."
+                )
         self.inserter = self._platform.create_inserter(
             restore_clipboard=self.settings_store.settings.restore_clipboard
         )
@@ -195,6 +202,13 @@ def run() -> int:
 
     qt_app = QApplication(sys.argv)
     qt_app.setQuitOnLastWindowClosed(False)
+    if sys.platform == "darwin":
+        # QApplication overrides Info.plist LSUIElement and sets the policy
+        # to Regular, which makes the app focus-stealing when any window
+        # shows. Force it back to Accessory so the HUD can appear without
+        # yanking focus from the user's text field.
+        from .platform.macos import configure_accessory_app
+        configure_accessory_app()
     icon_file = asset_path("icon.ico")
     if icon_file.exists():
         qt_app.setWindowIcon(QIcon(str(icon_file)))

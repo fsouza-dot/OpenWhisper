@@ -1,23 +1,20 @@
-# PyInstaller spec for OpenWhisper (macOS).
+# PyInstaller spec for OpenWhisper (macOS, Apple Silicon).
 #
-# Build on macOS with:
+# Build on an arm64 Mac with:
 #   python -m PyInstaller --noconfirm OpenWhisper-macos.spec
 #
 # Output: dist/OpenWhisper.app
 
 # -*- mode: python ; coding: utf-8 -*-
-from PyInstaller.utils.hooks import collect_all, collect_submodules
 import os
+from PyInstaller.utils.hooks import collect_all, collect_submodules
 
-# Determine icon path - use .icns if available, fall back to .png
 icon_path = "assets/icon.icns" if os.path.exists("assets/icon.icns") else "assets/icon.png"
 
 datas = [
     ("assets/icon.png", "assets"),
     ("openwhisper/resources/flags", "openwhisper/resources/flags"),
 ]
-
-# Add .icns if it exists
 if os.path.exists("assets/icon.icns"):
     datas.append(("assets/icon.icns", "assets"))
 
@@ -31,20 +28,25 @@ for pkg in ("faster_whisper", "ctranslate2", "tokenizers", "onnxruntime", "av"):
         binaries += b
         hiddenimports += h
     except Exception:
-        pass  # Package may not be installed
+        pass
 
 hiddenimports += collect_submodules("pynput")
 hiddenimports += collect_submodules("httpx")
 
-# macOS keyring backend
+# PyObjC frameworks used by the macOS platform layer.
+for fw in ("AppKit", "Foundation", "Quartz", "ApplicationServices"):
+    try:
+        hiddenimports += collect_submodules(fw)
+    except Exception:
+        pass
+
 hiddenimports += [
     "keyring.backends.macOS",
-]
-
-# Platform modules
-hiddenimports += [
     "openwhisper.platform.macos",
     "openwhisper.platform.macos.insertion",
+    "openwhisper.platform.macos.cgevent",
+    "openwhisper.platform.macos.accessibility",
+    "openwhisper.platform.macos.startup",
 ]
 
 a = Analysis(
@@ -74,7 +76,7 @@ exe = EXE(
     console=False,
     disable_windowed_traceback=False,
     argv_emulation=False,
-    target_arch=None,
+    target_arch="arm64",
     codesign_identity=None,
     entitlements_file=None,
 )
@@ -89,7 +91,6 @@ coll = COLLECT(
     name="OpenWhisper",
 )
 
-# Create macOS .app bundle
 app = BUNDLE(
     coll,
     name="OpenWhisper.app",
@@ -99,11 +100,15 @@ app = BUNDLE(
         "CFBundleName": "OpenWhisper",
         "CFBundleDisplayName": "OpenWhisper",
         "CFBundleGetInfoString": "Local-first dictation assistant",
-        "CFBundleVersion": "0.2.0",
-        "CFBundleShortVersionString": "0.2.0",
+        "CFBundleVersion": "0.3.5",
+        "CFBundleShortVersionString": "0.3.5",
+        "LSMinimumSystemVersion": "12.0",
         "NSHighResolutionCapable": True,
-        "LSUIElement": True,  # Hide from Dock (menu bar / tray app)
-        "NSMicrophoneUsageDescription": "OpenWhisper needs microphone access to transcribe your speech.",
-        "NSAppleEventsUsageDescription": "OpenWhisper needs automation access for text insertion.",
+        "LSUIElement": True,  # Menu bar app: no Dock icon.
+        "NSMicrophoneUsageDescription":
+            "OpenWhisper needs microphone access to transcribe your speech.",
+        "NSAppleEventsUsageDescription":
+            "OpenWhisper needs automation access to insert transcribed text "
+            "into the focused application.",
     },
 )

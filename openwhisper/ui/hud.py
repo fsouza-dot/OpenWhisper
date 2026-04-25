@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import sys
 from typing import List
 
 from PySide6.QtCore import Qt, QTimer
@@ -126,6 +127,9 @@ class HUDWindow(QWidget):
             g = screen.availableGeometry()
             self.move(g.center().x() - self.width() // 2, g.bottom() - self.height() - 80)
         super().showEvent(e)
+        if sys.platform == "darwin":
+            from ..platform.macos import make_window_non_activating
+            make_window_non_activating(self)
 
     def _on_phase(self, phase: Phase, _msg: str) -> None:
         self._phase = phase
@@ -141,4 +145,9 @@ class HUDWindow(QWidget):
             self._time = 0
             self._timer.start()
             self.show()
-            self.raise_()
+            # raise_() activates the app on macOS even with
+            # WA_ShowWithoutActivating. We rely on NSWindow level=Floating
+            # (set in make_window_non_activating) to keep the HUD above
+            # other windows without touching focus.
+            if sys.platform != "darwin":
+                self.raise_()

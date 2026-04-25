@@ -1,149 +1,96 @@
 # OpenWhisper on macOS
 
-## Installation
+OpenWhisper supports Apple Silicon Macs (M1 and later) running macOS 12 or
+newer. Intel Macs are not currently supported.
 
-### Download
+## Install
 
-Download the appropriate DMG for your Mac:
+1. Download `OpenWhisper-arm64.dmg` from
+   [Releases](https://github.com/fsouza-dot/OpenWhisper/releases).
+2. Open the DMG and drag **OpenWhisper** to **Applications**.
+3. Because the app is not signed with an Apple Developer certificate,
+   macOS Gatekeeper will quarantine it. Remove the quarantine flag once:
+   ```bash
+   xattr -cr /Applications/OpenWhisper.app
+   ```
+   Alternatively, the first time you launch the app, right-click it in
+   Applications and choose **Open**, then click **Open** in the dialog.
+4. Launch **OpenWhisper** from Applications. The icon appears in the
+   menu bar (top-right of the screen). The app deliberately does not
+   show in the Dock.
 
-- **Apple Silicon (M1/M2/M3)**: `OpenWhisper-arm64.dmg`
-- **Intel Mac**: `OpenWhisper-x86_64.dmg`
+## Permissions
 
-### Install
+OpenWhisper needs two macOS permissions to function. The first time you
+launch the app it asks for both.
 
-1. Open the DMG file
-2. Drag **OpenWhisper** to the **Applications** folder
-3. Eject the DMG
-4. Launch OpenWhisper from Applications
+### Microphone
 
-## Required Permissions
+Triggered automatically by macOS the first time you start a recording.
+If you previously denied it:
 
-OpenWhisper needs two system permissions to function properly:
+1. Open **System Settings → Privacy & Security → Microphone**.
+2. Enable **OpenWhisper**.
 
-### 1. Microphone Access
+### Accessibility
 
-macOS will automatically prompt for microphone access when you first try to record. Click **OK** to allow.
+Required so the app can register a global hotkey and paste transcribed
+text into the focused application. OpenWhisper presents the system
+prompt on first launch:
 
-If you denied access, you can enable it later:
-1. Open **System Settings** (or System Preferences on older macOS)
-2. Go to **Privacy & Security** > **Microphone**
-3. Find **OpenWhisper** and enable the toggle
+1. Open **System Settings → Privacy & Security → Accessibility**.
+2. Enable **OpenWhisper**.
+3. Quit and relaunch OpenWhisper for the change to take effect.
 
-### 2. Accessibility Access (for Global Hotkeys)
+If hotkeys appear to do nothing, this permission is the first thing to
+check.
 
-OpenWhisper needs accessibility access to register global hotkeys that work in any application.
+## Where files live
 
-1. Open **System Settings**
-2. Go to **Privacy & Security** > **Accessibility**
-3. Click the lock icon and enter your password
-4. Click **+** and add **OpenWhisper** from Applications
-5. Enable the toggle next to OpenWhisper
-
-**Note**: You may need to restart OpenWhisper after granting accessibility access.
+| Item | Location |
+|------|----------|
+| Settings | `~/Library/Application Support/OpenWhisper/settings.json` |
+| Logs | `~/Library/Application Support/OpenWhisper/openwhisper.log` |
+| Whisper models | `~/Library/Application Support/OpenWhisper/models/` |
+| API keys | macOS Keychain (service: `OpenWhisper`) |
+| Launch-at-login agent | `~/Library/LaunchAgents/com.openwhisper.app.plist` |
 
 ## Troubleshooting
 
-### "OpenWhisper is damaged and can't be opened"
+**"OpenWhisper is damaged and can't be opened"** — Gatekeeper quarantine.
+Run `xattr -cr /Applications/OpenWhisper.app`.
 
-This message appears because the app is not signed with an Apple Developer certificate. To bypass:
+**Hotkey does nothing** — Accessibility permission missing or app needs
+restart after granting it. Re-check System Settings → Privacy & Security
+→ Accessibility.
 
-**Option 1: Right-click to open**
-1. Right-click (or Control-click) on OpenWhisper in Applications
-2. Select **Open** from the context menu
-3. Click **Open** in the dialog that appears
+**No menu bar icon** — Your menu bar may be full. Tools like Bartender
+or Ice can reveal hidden icons. The app intentionally has no Dock icon.
 
-**Option 2: Remove quarantine attribute**
+**Microphone not detected** — Check System Settings → Privacy & Security
+→ Microphone. If the input device list is empty in OpenWhisper Settings,
+make sure your input device is connected and visible in System Settings
+→ Sound → Input.
+
+## Build from source
+
+Requires macOS 12+ on an Apple Silicon Mac, Homebrew, and Python 3.11+.
+
 ```bash
-xattr -cr /Applications/OpenWhisper.app
+git clone https://github.com/fsouza-dot/OpenWhisper.git
+cd OpenWhisper
+./build-macos.sh
 ```
 
-### Hotkey doesn't work
-
-1. Ensure accessibility permission is granted (see above)
-2. Try restarting OpenWhisper
-3. Check that your hotkey isn't conflicting with system shortcuts
-
-### No menu bar icon
-
-1. Check if your menu bar is full - some items may be hidden
-2. Try using a tool like Bartender or Dozer to reveal hidden icons
-3. Restart OpenWhisper
-
-### Microphone not detected
-
-1. Check System Settings > Privacy & Security > Microphone
-2. Ensure OpenWhisper has permission
-3. Try selecting a different input device in Settings
-
-## Configuration
-
-All settings are accessible from the menu bar icon:
-1. Click the OpenWhisper icon in the menu bar
-2. Select **Settings...**
-
-Settings are saved to: `~/Library/Application Support/OpenWhisper/`
+The script installs portaudio via Homebrew, sets up a virtualenv,
+installs dependencies, generates the icon, runs PyInstaller, and
+packages the result as `OpenWhisper-arm64.dmg`.
 
 ## Uninstall
 
-1. Quit OpenWhisper from the menu bar
-2. Delete OpenWhisper from Applications
-3. (Optional) Remove settings:
-   ```bash
-   rm -rf ~/Library/Application\ Support/OpenWhisper
-   ```
-
-## Building from Source
-
-### Prerequisites
-
-- macOS 12+ (Monterey or later)
-- Python 3.11+
-- Homebrew
-
-### Setup
-
-```bash
-# Install system dependencies
-brew install portaudio
-
-# Clone the repository
-git clone https://github.com/fsouza-dot/OpenWhisper.git
-cd OpenWhisper
-
-# Create virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Run in development mode
-python -m openwhisper
-```
-
-### Build .app Bundle
-
-```bash
-# Install PyInstaller
-pip install pyinstaller
-
-# Build
-python -m PyInstaller --noconfirm OpenWhisper-macos.spec
-
-# Output: dist/OpenWhisper.app
-```
-
-### Create DMG
-
-```bash
-mkdir -p dmg_staging
-cp -r dist/OpenWhisper.app dmg_staging/
-ln -s /Applications dmg_staging/Applications
-hdiutil create -volname "OpenWhisper" -srcfolder dmg_staging -ov -format UDZO OpenWhisper.dmg
-```
-
-## Known Limitations
-
-- **Unsigned app**: Requires manual bypass of Gatekeeper (see Troubleshooting)
-- **Text insertion**: Works best in standard text fields; some apps may require accessibility permission
-- **Local Whisper**: Downloads models on first use (~1-3GB depending on model size)
+1. Quit OpenWhisper from the menu bar.
+2. Delete `/Applications/OpenWhisper.app`.
+3. Disable launch-at-login (if enabled): `rm ~/Library/LaunchAgents/com.openwhisper.app.plist`.
+4. Remove user data: `rm -rf ~/Library/Application\ Support/OpenWhisper`.
+5. Remove the Keychain entry from **Keychain Access** (search for
+   `OpenWhisper`) if you stored a Groq API key.

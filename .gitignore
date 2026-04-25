@@ -23,8 +23,15 @@ ENV/
 build/
 dist/
 *.manifest
-# Keep the spec file — it's part of the build config.
+*.dmg
+# Keep the spec files — they are part of the build config.
 !OpenWhisper.spec
+!OpenWhisper-macos.spec
+!OpenWhisper-linux.spec
+
+# ---------- Generated icon (built from assets/icon.png on each build) ----------
+assets/icon.icns
+assets/icon.iconset/
 
 # ---------- Editor / tooling state ----------
 .vscode/
