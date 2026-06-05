@@ -48,6 +48,7 @@ class AudioRecorder:
         self._chunks: List[np.ndarray] = []
         self._lock = threading.Lock()
         self._is_recording = False
+        self._stream_open = False
         self._device_name: Optional[str] = None
         self._on_levels: Optional[Callable[[List[float]], None]] = None
 
@@ -56,20 +57,26 @@ class AudioRecorder:
         return self._is_recording
 
     def set_device(self, name: Optional[str]) -> None:
-        self._device_name = name
-
-    def set_levels_callback(self, callback: Optional[Callable[[List[float]], None]]) -> None:
-        """Set callback to receive audio levels for visualization.
-
-        Callback receives a list of NUM_LEVEL_BANDS floats (0.0-1.0).
-        """
-        self._on_levels = callback
-
-    def start(self) -> None:
-        if self._is_recording:
+        if name == self._device_name:
             return
-        with self._lock:
-            self._chunks.clear()
+        self._device_name = name
+        if self._stream_open:
+            # Reopen with new device so next press uses it immediately.
+            self.close_stream()
+            try:
+                self.open_stream()
+            except MicrophoneUnavailable as exc:
+                log.warning("Failed to reopen stream for new device: %s", exc)
+
+    def open_stream(self) -> None:
+        """Pre-initialize the audio stream once at startup.
+
+        Calls start() then stop() so the WASAPI IAudioClient is already
+        negotiated. Subsequent start() calls resume in ~5-30ms instead of
+        the 50-300ms needed for a cold open.
+        """
+        if self._stream_open:
+            return
         try:
             device = resolve_input_device(self._device_name)
             self._stream = sd.InputStream(
@@ -81,11 +88,47 @@ class AudioRecorder:
                 device=device,
             )
             self._stream.start()
+            self._stream.stop()  # warm the WASAPI client; mic is released until next start()
+            self._stream_open = True
+            log.info("Audio stream pre-initialized at %d Hz (device=%s)", SAMPLE_RATE, self._device_name or "default")
         except Exception as exc:
-            log.error("Failed to start audio stream: %s", exc)
+            log.error("Failed to pre-initialize audio stream: %s", exc)
+            raise MicrophoneUnavailable(str(exc)) from exc
+
+    def close_stream(self) -> None:
+        """Fully close the stream on app shutdown or device change."""
+        self._stream_open = False
+        self._is_recording = False
+        if self._stream is not None:
+            try:
+                self._stream.stop()
+                self._stream.close()
+            except Exception as exc:  # pragma: no cover
+                log.warning("Error closing stream: %s", exc)
+            self._stream = None
+
+    def set_levels_callback(self, callback: Optional[Callable[[List[float]], None]]) -> None:
+        """Set callback to receive audio levels for visualization.
+
+        Callback receives a list of NUM_LEVEL_BANDS floats (0.0-1.0).
+        """
+        self._on_levels = callback
+
+    def start(self) -> None:
+        if self._is_recording:
+            return
+        # If open_stream() was never called (e.g. in tests), open lazily.
+        if not self._stream_open:
+            self.open_stream()
+        with self._lock:
+            self._chunks.clear()
+        try:
+            self._stream.start()  # fast resume — WASAPI client already initialized
+        except Exception as exc:
+            log.error("Failed to resume audio stream: %s", exc)
             raise MicrophoneUnavailable(str(exc)) from exc
         self._is_recording = True
-        log.info("Recording started at %d Hz", SAMPLE_RATE)
+        log.info("Recording started")
 
     def stop(self) -> AudioBuffer:
         if not self._is_recording:
@@ -93,11 +136,9 @@ class AudioRecorder:
         self._is_recording = False
         if self._stream is not None:
             try:
-                self._stream.stop()
-                self._stream.close()
+                self._stream.stop()  # pause; WASAPI client stays warm, mic indicator off
             except Exception as exc:  # pragma: no cover
                 log.warning("Error stopping stream: %s", exc)
-            self._stream = None
 
         with self._lock:
             chunks = self._chunks
@@ -114,6 +155,8 @@ class AudioRecorder:
     def _on_audio(self, indata: np.ndarray, frames: int, time_info, status) -> None:
         if status:
             log.debug("sounddevice status: %s", status)
+        if not self._is_recording:
+            return  # Stream is open but idle — discard frames.
         # indata is (frames, channels); we force mono by taking channel 0.
         chunk = indata[:, 0].copy() if indata.ndim == 2 else indata.copy()
         with self._lock:

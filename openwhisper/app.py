@@ -59,6 +59,11 @@ class OpenWhisperApp(QObject):
         self.settings_store.subscribe(
             lambda s: self.recorder.set_device(s.input_device)
         )
+        # Open the audio stream once at startup so push-to-talk has no open-latency.
+        try:
+            self.recorder.open_stream()
+        except Exception as exc:
+            log.warning("Could not pre-open audio stream at startup: %s", exc)
         self.hotkey = HotkeyManager()
         self._platform = get_platform()
         if sys.platform == "darwin":
@@ -192,6 +197,10 @@ class OpenWhisperApp(QObject):
         log.info("Shutting down OpenWhisper")
         try:
             self.coordinator.stop()
+        except Exception:  # pragma: no cover
+            pass
+        try:
+            self.recorder.close_stream()
         except Exception:  # pragma: no cover
             pass
         self.qt_app.quit()
